@@ -35,11 +35,11 @@ const config = {
   },
   GUI: {
     gui_click_enabled: true,
-    gui_click_item: ['netherite_chestplate', 'nether_star']
+    gui_click_item: ['netherite_chestplate', 'clock']
   },
   // 1‑4 mesaj kategorisi
   Message1: {
-    mab_enabled: true,
+    mab_enabled: false,
     start_delay: 15,
     message_delay: 16,
     repeat: false,
@@ -63,7 +63,7 @@ const config = {
     chatmessages: ["/rtp"]
   },
   Message4: {
-    mab_enabled: true,
+    mab_enabled: false,
     start_delay: 120,
     message_delay: 120,
     repeat: true,
