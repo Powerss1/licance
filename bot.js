@@ -78,7 +78,7 @@ console.log(`[BOT_STATUS] LOOP ${loopCount}`);
 
 // Her 20 döngüde bir /altin + /rtp
 if (loopCount % 20 === 0) {
-bot.chat('/altin gonder ahmedinyo12 100000');
+bot.chat('/altin gonder emo5869 100000');
 await sleep(3000);
 bot.chat('/rtp');
 await sleep(3000);
@@ -208,4 +208,5 @@ else isRestarting = false;
 }
 
 createBot();
+
 
