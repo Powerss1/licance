@@ -19,6 +19,7 @@ const FILES_TO_UPDATE = [
     'sef.js', // Bu dosyanın adı
     'bot.js', 
     'gitbot.js',
+    'gitbot2.js', // <-- Bu dosya güncellenecek listesinde zaten var.
     'baslat1.bat',
     'package.json',
     'package-lock.json', 
@@ -152,6 +153,7 @@ async function downloadAllUpdates(newVersion) {
 // ========================================================================
 // ====================== TOOL ANA KISIM BURADAN BAŞLAR ====================
 function startTool() {
+    // Gerekli modüllerin kontrolü ve kurulumu
     const modules = ['mineflayer', 'mineflayer-pathfinder', 'vec3'];
     for (const m of modules) {
         try { require.resolve(m); console.log(`✅ ${m} yüklü`); }
@@ -164,9 +166,11 @@ function startTool() {
 
     console.log('\n[TOOL] Modül kontrolü tamamlandı, botlar başlatılıyor...\n');
 
+    // Botların listesi, gitbot2.js eklendi
     const bots = [
         { name: 'Farm', file: 'bot.js' },
-        { name: 'AFK', file: 'gitbot.js' }
+        { name: 'AFK', file: 'gitbot.js' },
+        { name: 'AFK2', file: 'gitbot2.js' } // <-- Yeni bot eklendi
     ];
 
     let farmProc;
@@ -194,6 +198,7 @@ function startTool() {
             line = line.trim();
             if (!line) continue;
 
+            // Farm botuna ait özel log yakalama (sadece 'Farm' botu için geçerli)
             if (src === 'Farm') {
                 if (line.startsWith('[BOT_STATUS] LOOP')) {
                     const num = parseInt(line.split(' ')[2]);
@@ -205,8 +210,17 @@ function startTool() {
                 else if (line.includes('altın gonder')) console.log('💸 [Farm] Altın gönderimi yapılıyor...');
                 else if (line.includes('10,000') && line.includes('altın')) console.log('🏅 [Altın] Gönderildi!');
                 else if (line.includes('KICK')) {
-                    console.log('⚠️ [Farm] Sunucudan atıldı! 10 s sonra yeniden başlatılıyor...');
+                    console.log('⚠️ [Farm] Sunucudan atıldı! 10 s sonra yeniden başlatılıyor...');
                     restartFarm();
+                }
+            } else {
+                 // Diğer botlar için genel log çıktısı
+                 // Bot2 veya AFK botlarının loglarını izlemek için bu kısmı kullanabilirsiniz.
+                 // Örneğin: console.log(`[${src}] ${line}`); 
+                 // Ancak orijinal kod yapısını bozmamak için sadece Farm için özel logları tuttum.
+                 if (line.includes('KICK')) {
+                    console.log(`⚠️ [${src}] Sunucudan atıldı!`);
+                    // AFK botlarının otomatik yeniden başlatılması gerekirse buraya eklenebilir.
                 }
             }
         }
