@@ -18,10 +18,10 @@ const settings = {
 minecraft: {
 host: 'oyna.craftluna.net',
 port: 25565,
-username: 'essekliekmek',
+username: 'enlantika',
 version: '1.20.1'
 },
-Auth: { auth_enabled: true, auth_password: '/login power111', auth_delay: 5 },
+Auth: { auth_enabled: true, auth_password: '/login power000', auth_delay: 5 },
 GUI: { gui_click_enabled: true, gui_click_item: ['netherite_chestplate', 'clock'] } // netherite_chestplate (13. slot) Towny menüsüdür
 };
 
@@ -208,6 +208,7 @@ else isRestarting = false;
 }
 
 createBot();
+
 
 
 
