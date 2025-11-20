@@ -21,6 +21,7 @@ const FILES_TO_UPDATE = [
     'gitbot.js',
     'gitbot2.js', // <-- Bu dosya güncellenecek listesinde zaten var.
     'baslat1.bat',
+    'manuel_loader.js',
     'package.json',
     'package-lock.json', 
     'version.txt' // Sürüm kontrol dosyası
@@ -237,3 +238,4 @@ function startTool() {
         }, 10000);
     }
 }
+
