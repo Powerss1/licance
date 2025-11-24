@@ -26,7 +26,7 @@ const config = {
   },
   Auth: {
     auth_enabled: true,
-    auth_password: '/login power000',
+    auth_password: '/login power111',
     auth_delay: 5
   },
   AutoReconnect: {
@@ -169,6 +169,7 @@ async function runMessageLoop(block, index) {
 
 // === BOTU BAŞLAT ===
 createBot();
+
 
 
 
