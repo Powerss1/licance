@@ -18,7 +18,7 @@ const settings = {
 minecraft: {
 host: 'oyna.craftluna.net',
 port: 25565,
-username: 'enlantika',
+username: 'ShieldNova',
 version: '1.20.1'
 },
 Auth: { auth_enabled: true, auth_password: '/login power000', auth_delay: 5 },
@@ -208,6 +208,7 @@ else isRestarting = false;
 }
 
 createBot();
+
 
 
 
