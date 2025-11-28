@@ -59,7 +59,7 @@ const config = {
     start_delay: 30,
     message_delay: 60,
     repeat: true,
-    repeat_delay: 300,
+    repeat_delay: 200,
     chatmessages: ["/rtp"]
   },
   Message4: {
@@ -169,6 +169,7 @@ async function runMessageLoop(block, index) {
 
 // === BOTU BAŞLAT ===
 createBot();
+
 
 
 
