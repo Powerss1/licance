@@ -20,9 +20,6 @@ const FILES_TO_UPDATE = [
     'bot.js', 
     'gitbot.js',
     'gitbot2.js',
-    'gitbot3.js',
-    'gitbot4.js',
-    'gitbot5.js',// <-- Bu dosya güncellenecek listesinde zaten var.
     'baslat1.bat',
     'manuel_loader.js',
     'manuel_loader.bat',
@@ -245,6 +242,7 @@ function startTool() {
         }, 10000);
     }
 }
+
 
 
 
