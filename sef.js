@@ -175,9 +175,9 @@ function startTool() {
     const bots = [
         { name: 'Farm', file: 'bot.js' },
         { name: 'AFK', file: 'gitbot.js' },
-        { name: 'AFK2', file: 'gitbot2.js' } // <-- Yeni bot eklendi
-        { name: 'AFK3', file: 'gitbot3.js' } // <-- Yeni bot eklendi
-        { name: 'AFK4', file: 'gitbot4.js' } // <-- Yeni bot eklendi
+        { name: 'AFK2', file: 'gitbot2.js' }, // <-- Yeni bot eklendi
+        { name: 'AFK3', file: 'gitbot3.js' }, // <-- Yeni bot eklendi
+        { name: 'AFK4', file: 'gitbot4.js' }, // <-- Yeni bot eklendi
         { name: 'AFK5', file: 'gitbot5.js' } // <-- Yeni bot eklendi
     ];
 
@@ -245,6 +245,7 @@ function startTool() {
         }, 10000);
     }
 }
+
 
 
 
