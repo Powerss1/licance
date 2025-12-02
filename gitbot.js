@@ -17,7 +17,7 @@ const fs = require('fs');
 // Bu yapı doğrudan örnekteki YAML içeriğinin sade JSON eşdeğeri
 const config = {
   login: {
-    username: 'KardoHamit',
+    username: 'Aslaneldelo',
     premium_password: '',
     type: '',
     server_ip: 'oyna.craftluna.net',
@@ -169,6 +169,7 @@ async function runMessageLoop(block, index) {
 
 // === BOTU BAŞLAT ===
 createBot();
+
 
 
 
