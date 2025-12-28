@@ -42,6 +42,8 @@ const FILES_TO_UPDATE = [
 
     'gitbot2.js',
 
+    'gitbot3.js',
+
     'baslat1.bat',
 
     'manuel_loader.js',
@@ -348,6 +350,8 @@ function startTool() {
 
         { name: 'AFK2', file: 'gitbot2.js' }, // <-- Yeni bot eklendi
 
+        { name: 'AFK3', file: 'gitbot3.js' }, // <-- Yeni bot eklendi
+
     ];
 
 
@@ -479,3 +483,4 @@ function startTool() {
     }
 
 }
+
