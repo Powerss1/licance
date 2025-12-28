@@ -17,7 +17,7 @@ const fs = require('fs');
 // Bu yapı doğrudan örnekteki YAML içeriğinin sade JSON eşdeğeri
 const config = {
   login: {
-    username: 'PowerFedaisi',
+    username: 'Powerfedaisi',
     premium_password: '',
     type: '',
     server_ip: 'oyna.craftluna.net',
