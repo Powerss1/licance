@@ -18,7 +18,7 @@ const CONFIG = {
     towny_item: 'netherite_chestplate', // Towny sunucu seçim itemi
     
     // --- ANTİ-AFK AYARLARI ---
-    anti_afk: true,      
+    anti_afk: false,      
     walk_radius: 4       
 };
 
@@ -321,5 +321,6 @@ function createBot() {
     bot.on('error', (err) => console.log(`[HATA] ${err.message}`));
     bot.on('kicked', (r) => console.log(`[ATILDI] ${r}`));
 }
+
 
 createBot();
