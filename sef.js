@@ -1,9 +1,9 @@
 // =================================================================
-// ========== POWERSS COMMAND CENTER - FINAL FIXED EDITION =========
+// ========== POWERSS COMMAND CENTER - AUTO UPDATE EDITION =========
 // =================================================================
 
 const readline = require('readline');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const https = require('https');
 
@@ -14,7 +14,10 @@ const CONFIG = {
     repoName: 'licance',
     branch: 'main',       
     secretFileName: 'secret.txt', 
-    refreshRate: 100,     
+    refreshRate: 100,
+    
+    // Güncellenecek Dosyalar
+    filesToUpdate: ['sef.js', 'bot.js', 'package.json']     
 };
 
 // === MANUEL BOT LİSTESİ ===
@@ -43,7 +46,84 @@ function greyGradient(text, offset = 0) {
 const cursorTo = (x, y) => process.stdout.write(`\x1b[${y + 1};${x + 1}H`);
 const clearScreen = () => process.stdout.write('\x1Bc');
 
-// ================= GITHUB KONTROL =================
+// ================= GÜNCELLEME SİSTEMİ (YENİ) =================
+
+// Yardımcı: URL'den metin okuma
+function fetchString(url) {
+    return new Promise((resolve) => {
+        https.get(url, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => resolve(data.trim()));
+        }).on('error', () => resolve(null));
+    });
+}
+
+// Yardımcı: Dosya indirme
+function downloadFile(url, dest) {
+    return new Promise((resolve) => {
+        const file = fs.createWriteStream(dest);
+        https.get(url, (res) => {
+            res.pipe(file);
+            file.on('finish', () => {
+                file.close(() => resolve(true));
+            });
+        }).on('error', () => {
+            fs.unlink(dest, () => resolve(false)); 
+        });
+    });
+}
+
+async function checkForUpdates() {
+    console.log(greyGradient("\n    📡 Güncellemeler Denetleniyor...", 0));
+
+    // 1. Yerel Sürüm Kontrolü
+    if (!fs.existsSync('version.txt')) {
+        fs.writeFileSync('version.txt', '1.0');
+    }
+    let localVer = parseFloat(fs.readFileSync('version.txt', 'utf8'));
+    if (isNaN(localVer)) localVer = 1.0;
+
+    // 2. Uzak Sürüm Kontrolü
+    const versionUrl = `https://raw.githubusercontent.com/${CONFIG.repoOwner}/${CONFIG.repoName}/${CONFIG.branch}/version.txt`;
+    const remoteVerStr = await fetchString(versionUrl);
+    
+    if (!remoteVerStr) {
+        console.log("    ⚠️ Sunucuya erişilemedi, güncelleme atlanıyor.");
+        return;
+    }
+
+    const remoteVer = parseFloat(remoteVerStr);
+
+    // 3. Karşılaştırma
+    if (remoteVer > localVer) {
+        console.log(greyGradient(`    ⬇️ YENİ SÜRÜM BULUNDU: v${remoteVer} (Mevcut: v${localVer})`, 5));
+        console.log("    Dosyalar indiriliyor, lütfen bekleyin...");
+
+        for (const file of CONFIG.filesToUpdate) {
+            const fileUrl = `https://raw.githubusercontent.com/${CONFIG.repoOwner}/${CONFIG.repoName}/${CONFIG.branch}/${file}`;
+            process.stdout.write(`    > ${file} indiriliyor... `);
+            const success = await downloadFile(fileUrl, file);
+            if (success) console.log("✅");
+            else console.log("❌");
+        }
+
+        // Sürümü güncelle
+        fs.writeFileSync('version.txt', remoteVer.toString());
+        
+        console.log("\n    ✅ GÜNCELLEME TAMAMLANDI! Tool yeniden başlatılıyor...");
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Programı yeniden başlat (Self-Restart)
+        spawn(process.argv[0], process.argv.slice(1), { stdio: 'inherit' }).unref();
+        process.exit();
+    } else {
+        console.log(greyGradient(`    ✅ SİSTEM GÜNCEL (v${localVer})`, 10));
+        await new Promise(r => setTimeout(r, 1000));
+    }
+}
+
+// ================= GITHUB LİSANS DOSYA KONTROLÜ =================
 function checkSecretFile() {
     return new Promise((resolve) => {
         const url = `https://raw.githubusercontent.com/${CONFIG.repoOwner}/${CONFIG.repoName}/${CONFIG.branch}/${CONFIG.secretFileName}`;
@@ -132,30 +212,24 @@ function renderDashboard() {
     const maxLogs = 5;
     const logsToShow = systemLogs.slice(-maxLogs);
     logsToShow.forEach(log => {
-        // Satır sonunu temizle (\x1b[K) ki eski yazılar kalmasın
         process.stdout.write(`  > ${log}\x1b[K\n`);
     });
     for(let i=0; i < maxLogs - logsToShow.length; i++) process.stdout.write("\x1b[K\n");
 
     process.stdout.write(greyGradient(`╚${border}╝`, animationTick));
-    
-    // Alt kısmı temizle (Taşan yazıları silmek için)
     process.stdout.write("\n\x1b[J"); 
 }
 
 function addLog(botName, text) {
     const time = new Date().toLocaleTimeString('tr-TR');
-    // Renk kodlarını ve gereksiz boşlukları temizle
     const cleanText = text.replace(/\x1b\[[0-9;]*m/g, '').trim();
     if (!cleanText) return;
-
-    // Log formatı
     const logLine = `\x1b[90m${time}\x1b[0m \x1b[36m[${botName}]\x1b[0m \x1b[37m${cleanText}\x1b[0m`;
     systemLogs.push(logLine);
     if (systemLogs.length > 20) systemLogs.shift();
 }
 
-// ================= BOT YÖNETİMİ (BUFFER FIX) =================
+// ================= BOT YÖNETİMİ =================
 function startAllBots() {
     bots.forEach(bot => {
         if (!fs.existsSync(bot.file)) return; 
@@ -165,17 +239,11 @@ function startAllBots() {
         const proc = spawn('node', [bot.file]);
         bot.process = proc;
 
-        // VERİ PARÇALAMA (BUFFER FIX)
-        // Gelen veriyi biriktirip satır satır işleyeceğiz
         let dataBuffer = "";
 
         proc.stdout.on('data', (d) => {
             dataBuffer += d.toString();
-            
-            // Satır sonlarına göre böl
             const lines = dataBuffer.split('\n');
-            
-            // Son parça yarım kalmış olabilir, onu buffera geri at
             dataBuffer = lines.pop();
 
             lines.forEach(line => {
@@ -189,9 +257,7 @@ function startAllBots() {
                     if(moneyMatch) bot.money = moneyMatch[0];
                 }
 
-                // Sadece önemli mesajları loga ekle
                 if (txt.includes('HATA') || txt.includes('KAZANÇ') || txt.includes('TRANSFER')) {
-                     // Ham metni temizleyip gönderiyoruz
                      const cleanLog = txt.replace(/\[.*?\]/g, '').trim(); 
                      addLog(bot.name, cleanLog);
                 }
@@ -221,14 +287,20 @@ function showLoginScreen() {
     console.log(greyGradient("    ╚═╝      ╚═════╝  ╚══╝╚══╝ ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝", 25));
     console.log("\n");
     
-    rl.question(greyGradient('LİSANS ANAHTARI: ', 0), async (key) => {
+    rl.question(greyGradient(' LİSANS ANAHTARI: ', 0), async (key) => {
         if (key.trim() !== CONFIG.licenseKey) {
             console.log("\n    ❌ Hatalı Anahtar!");
             process.exit(0);
         }
         
-        console.log("\n    ✅ Giriş Başarılı! Sunucu kontrol ediliyor...");
+        console.log("\n    ✅ Giriş Başarılı!");
+
+        // 1. GÜNCELLEME KONTROLÜ (Girişten hemen sonra)
+        await checkForUpdates();
         
+        console.log("\n    🔄 Sunucu lisans dosyası kontrol ediliyor...");
+        
+        // 2. SECRET DOSYA KONTROLÜ
         const isSecretExists = await checkSecretFile();
         if (!isSecretExists) {
             console.log("\n    ❌ HATA: Lisans doğrulanamadı!");
@@ -245,6 +317,4 @@ function showLoginScreen() {
 }
 
 showLoginScreen();
-
 process.on('exit', () => bots.forEach(b => b.process && b.process.kill()));
-
