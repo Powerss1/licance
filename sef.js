@@ -221,7 +221,7 @@ function showLoginScreen() {
     console.log(greyGradient("    ╚═╝      ╚═════╝  ╚══╝╚══╝ ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝", 25));
     console.log("\n");
     
-    rl.question(greyGradient('    🔐 LİSANS ANAHTARI: ', 0), async (key) => {
+    rl.question(greyGradient('LİSANS ANAHTARI: ', 0), async (key) => {
         if (key.trim() !== CONFIG.licenseKey) {
             console.log("\n    ❌ Hatalı Anahtar!");
             process.exit(0);
@@ -247,3 +247,4 @@ function showLoginScreen() {
 showLoginScreen();
 
 process.on('exit', () => bots.forEach(b => b.process && b.process.kill()));
+
