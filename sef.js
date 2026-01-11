@@ -231,7 +231,7 @@ function showLoginScreen() {
         
         const isSecretExists = await checkSecretFile();
         if (!isSecretExists) {
-            console.log("\n    ❌ HATA: Lisans doğrulanamadı (secret.txt bulunamadı)!");
+            console.log("\n    ❌ HATA: Lisans doğrulanamadı!");
             process.exit(1);
         }
 
@@ -245,4 +245,5 @@ function showLoginScreen() {
 }
 
 showLoginScreen();
+
 process.on('exit', () => bots.forEach(b => b.process && b.process.kill()));
