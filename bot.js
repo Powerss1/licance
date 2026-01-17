@@ -8,12 +8,12 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 // --- AYARLAR ---
 const CONFIG = {
     // BURAYI HER BOT DOSYASI İÇİN KENDİNE GÖRE DÜZENLE
-    username: 'Bountay', 
+    username: 'melihbaskan56', 
     host: 'oyna.craftluna.net',
     port: 25565,
     version: '1.20.1',
     
-    auth_cmd: '/login power111', 
+    auth_cmd: '/login power000', 
     auth_delay: 5,
     towny_item: 'netherite_chestplate', // Towny sunucu seçim itemi
     
@@ -324,3 +324,4 @@ function createBot() {
 
 
 createBot();
+
