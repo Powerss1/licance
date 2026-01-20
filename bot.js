@@ -166,8 +166,8 @@ async function startFarmerLoop() {
                     ]);
 
                     if (rtpWin !== 'timeout') {
-                        // 'clock' (saat) itemini bul
-                        const clockItem = rtpWin.slots.find(item => item && item.name.includes('clock'));
+                        // 'clock' (Kumpas) itemini bul
+                        const clockItem = rtpWin.slots.find(item => item && item.name.includes('recovery_compass'));
                         
                         if (clockItem) {
                             // Tıkla
@@ -324,4 +324,5 @@ function createBot() {
 
 
 createBot();
+
 
