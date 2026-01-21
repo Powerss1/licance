@@ -1,4 +1,4 @@
-// ------------------ BOUNTAY FARM BOT (15s AKTİF / 15s PASİF) ------------------
+// ------------------ BOUNTAY FARM BOT (AFK KAÇIŞ SİSTEMLİ) ------------------
 
 const fs = require('fs');
 const path = require('path');
@@ -7,18 +7,17 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 
 // --- AYARLAR ---
 const CONFIG = {
-    // BURAYI HER BOT DOSYASI İÇİN KENDİNE GÖRE DÜZENLE
-    username: 'AthenaX', 
+    username: 'melihbaskan56', 
     host: 'oyna.craftluna.net',
     port: 25565,
     version: '1.20.1',
     
-    auth_cmd: '/login power111', 
+    auth_cmd: '/login power000', 
     auth_delay: 5,
     towny_item: 'netherite_chestplate',
     
     // --- DÖNGÜ VE ZAMANLAMA ---
-    routine_loop: 40,   // Kaç döngüde bir RTP/Para atılacak
+    routine_loop: 40,   // Kaç döngüde bir Rutin RTP atılacak
     rest_time: 15000,   // Mola süresi (15 Saniye)
 
     // --- ANTİ-AFK ---
@@ -52,7 +51,7 @@ async function waitForWindow(timeout = 5000) {
     } catch { return null; }
 }
 
-// ============== ÇİFTÇİ & SAT SİSTEMİ (DENGELİ) ==============
+// ============== ÇİFTÇİ & SAT SİSTEMİ ==============
 
 async function doFarmer() {
     bot.chat('/çiftçi');
@@ -74,13 +73,12 @@ async function doSell() {
     const win = await waitForWindow(3000);
 
     if (win) {
-        // Slot 45-80 arası sat
-        // Tıklama hızı 140ms yapıldı (Toplam ~5-6 saniye sürer)
+        // Slot 45-80 arası sat (Hız: 140ms)
         for (let slot = 45; slot <= 80; slot++) {
             if (!win.slots[slot]) continue; 
             try {
                 bot.clickWindow(slot, 0, 1); 
-                await sleep(140); // İSTEĞİN ÜZERİNE 140ms YAPILDI
+                await sleep(140); 
             } catch {}
         }
         await sleep(500); 
@@ -88,47 +86,76 @@ async function doSell() {
     }
 }
 
-// ============== RUTİN İŞLEMLERİ (RTP & PARA) ==============
-
-async function performRoutine() {
-    isBusy = true;
-    if(CONFIG.anti_afk) bot.clearControlStates();
-
-    console.log(`[RUTİN] ${loopCount}. döngü: Para ve RTP...`);
-
-    // 1. Para Gönder
-    bot.chat('/altin gonder emo5869 100000');
-    await sleep(2000);
-
-    // 2. RTP
+// ============== RTP İŞLEMİ (ORTAK FONKSİYON) ==============
+// Hem rutin hem de kaçış için kullanılacak
+async function executeRTP() {
     bot.chat('/rtp');
     const rtpWin = await waitForWindow(5000);
 
     if (rtpWin) {
-        // Recovery Compass (Kurtarma Pusulası) bul
         const compass = rtpWin.slots.find(item => item && item.name.includes('recovery_compass'));
 
         if (compass) {
             await sleep(800);
             try {
                 await bot.clickWindow(compass.slot, 0, 0);
-                console.log('[RUTİN] Pusulaya tıklandı, ışınlanılıyor...');
-                await sleep(5000); 
+                console.log('[HAREKET] RTP atıldı, ışınlanma bekleniyor...');
+                await sleep(8000); // Işınlanma süresi
+                
+                // Yeni konumu kaydet
+                if (bot.entity) {
+                    anchorPoint = bot.entity.position.clone();
+                    console.log('[MERKEZ] Yeni konum kaydedildi.');
+                }
             } catch (e) { console.log(`[HATA] Tıklama sorunu: ${e.message}`); }
         } else {
             console.log('[HATA] RTP menüsünde Pusula bulunamadı!');
             bot.closeWindow(rtpWin);
         }
     }
+}
+
+// ============== RUTİN İŞLEMLERİ (PARA & PLANLI RTP) ==============
+
+async function performRoutine() {
+    isBusy = true;
+    if(CONFIG.anti_afk) bot.clearControlStates();
+
+    console.log(`[RUTİN] ${loopCount}. döngü: Para gönderiliyor...`);
     
-    if (bot.entity) anchorPoint = bot.entity.position.clone();
+    // 1. Para Gönder
+    bot.chat('/altin gonder emo5869 100000');
+    await sleep(2000);
+
+    // 2. Planlı RTP
+    console.log('[RUTİN] Planlı RTP atılıyor...');
+    await executeRTP();
+    
     isBusy = false;
 }
 
-// ============== ANA DÖNGÜ (15sn İŞLEM / 15sn MOLA) ==============
+// ============== AFK KONTROL VE KAÇIŞ SİSTEMİ ==============
+async function checkAndEscapeAFK() {
+    if (!bot.entity || !anchorPoint) return false;
+
+    // Eğer bot merkezden 20 bloktan fazla uzaklaşmışsa (AFK'ya çekilmiş demektir)
+    const distance = bot.entity.position.distanceTo(anchorPoint);
+
+    if (distance > 20) {
+        console.log(`[GÜVENLİK] DİKKAT! Bot merkezden ${Math.floor(distance)} blok uzakta! (AFK Bölgesi?)`);
+        console.log('[GÜVENLİK] 15sn bekleme iptal edildi, ACİL RTP atılıyor...');
+        
+        await executeRTP(); // Kaçış RTP'si
+        return true; // Kaçış yapıldı
+    }
+    
+    return false; // Sorun yok
+}
+
+// ============== ANA DÖNGÜ ==============
 
 async function startFarmerLoop() {
-    console.log('[SİSTEM] Farm Başladı. (~15s Aktif / 15s Pasif)');
+    console.log('[SİSTEM] Farm Başladı. (~15s Aktif / 15s Pasif + AFK Koruması)');
 
     while (isFarmerActive) {
         try {
@@ -146,19 +173,21 @@ async function startFarmerLoop() {
                 return;
             }
 
-            // --- C. İŞLEM ZAMANI (Hedef: ~15 Saniye) ---
-            
-            // 1. Çiftçi (~3 saniye sürer)
+            // --- C. İŞLEM ZAMANI (~15 Saniye) ---
             await doFarmer();
-            
-            // Ara Bekleme (Süreyi 15 saniyeye tamamlamak için uzatıldı)
             await sleep(3000); 
-            
-            // 2. Sat (~9 saniye sürer -> 36 slot * 140ms + gecikmeler)
             await doSell();
             
-            // --- D. MOLA ZAMANI (Tam 15 Saniye) ---
-            await sleep(CONFIG.rest_time);
+            // --- D. MOLA VE AFK KONTROLÜ (15 Saniye) ---
+            // Burası kritik: Mola vermeden önce "Ben neredeyim?" diye bakar.
+            
+            const escaped = await checkAndEscapeAFK();
+
+            if (!escaped) {
+                // Eğer kaçış yapmadıysa (yerindeyse), normal 15 saniye molasını verir.
+                // Eğer kaçış yaptıysa, zaten RTP süresince beklediği için tekrar 15sn beklemesine gerek yok (zaman kazancı).
+                await sleep(CONFIG.rest_time);
+            }
 
         } catch (e) {
             console.log(`[DÖNGÜ HATA] ${e.message}`);
@@ -203,7 +232,6 @@ function createBot() {
         setTimeout(() => { bot.chat('/menu'); }, 7000);
     });
 
-    // --- SEF.JS İÇİN LOG YAKALAYICI ---
     bot.on('message', (msg) => {
         const text = msg.toString();
         if (text.includes('+$') || text.includes('hesabınıza') || text.includes('satıldı')) {
@@ -214,7 +242,6 @@ function createBot() {
         }
     });
 
-    // --- MENÜ TETİKLEYİCİSİ ---
     bot.on('windowOpen', async (window) => {
         if (isFarmerActive) return;
 
