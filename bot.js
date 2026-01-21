@@ -1,4 +1,4 @@
-// ------------------ BOUNTAY FARM BOT (PERFORMANS & ZAMANLAMA SÜRÜMÜ) ------------------
+// ------------------ BOUNTAY FARM BOT (15s AKTİF / 15s PASİF) ------------------
 
 const fs = require('fs');
 const path = require('path');
@@ -8,22 +8,21 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 // --- AYARLAR ---
 const CONFIG = {
     // BURAYI HER BOT DOSYASI İÇİN KENDİNE GÖRE DÜZENLE
-    username: 'melihbaskan56', 
+    username: 'AthenaX', 
     host: 'oyna.craftluna.net',
     port: 25565,
     version: '1.20.1',
     
-    auth_cmd: '/login power000', 
+    auth_cmd: '/login power111', 
     auth_delay: 5,
     towny_item: 'netherite_chestplate',
     
     // --- DÖNGÜ VE ZAMANLAMA ---
     routine_loop: 40,   // Kaç döngüde bir RTP/Para atılacak
-    active_time: 10000, // İşlemlerin süresi (Hedef)
-    rest_time: 10000,   // Mola süresi (10 Saniye)
+    rest_time: 15000,   // Mola süresi (15 Saniye)
 
     // --- ANTİ-AFK ---
-    anti_afk: false, // Kapalıyken işlemciyi yormaz
+    anti_afk: false, 
     walk_radius: 4       
 };
 
@@ -39,12 +38,10 @@ let isFarmerActive = false;
 let loopCount = 0;
 let anchorPoint = null;
 
-// Daha stabil bekleme fonksiyonu
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ============== PENCERE YÖNETİCİSİ (Hafifletilmiş) ==============
+// ============== PENCERE YÖNETİCİSİ ==============
 
-// Pencerenin açılmasını bekleyen güvenli fonksiyon
 async function waitForWindow(timeout = 5000) {
     try {
         const window = await Promise.race([
@@ -55,17 +52,15 @@ async function waitForWindow(timeout = 5000) {
     } catch { return null; }
 }
 
-// ============== ÇİFTÇİ & SAT SİSTEMİ (HIZLI) ==============
+// ============== ÇİFTÇİ & SAT SİSTEMİ (DENGELİ) ==============
 
 async function doFarmer() {
     bot.chat('/çiftçi');
     const win = await waitForWindow(3000);
     
     if (win) {
-        // Slot 21'e tıkla (Çiftçi Topla)
         try {
             await bot.clickWindow(21, 0, 1);
-            // Menünün kapanması veya işlem onayı için kısa bekleme
             await sleep(1500); 
             bot.closeWindow(win);
         } catch (e) {
@@ -79,16 +74,16 @@ async function doSell() {
     const win = await waitForWindow(3000);
 
     if (win) {
-        // Slot 45-80 arası hızlıca sat (5-6 saniye hedefleniyor)
-        // Hızlandırılmış tıklama (70ms)
+        // Slot 45-80 arası sat
+        // Tıklama hızı 140ms yapıldı (Toplam ~5-6 saniye sürer)
         for (let slot = 45; slot <= 80; slot++) {
-            if (!win.slots[slot]) continue; // Boşsa geç
+            if (!win.slots[slot]) continue; 
             try {
-                bot.clickWindow(slot, 0, 1); // Await kullanmadan "fire-and-forget" yapabiliriz ama güvenli olsun diye kısa await
-                await sleep(70); 
+                bot.clickWindow(slot, 0, 1); 
+                await sleep(140); // İSTEĞİN ÜZERİNE 140ms YAPILDI
             } catch {}
         }
-        await sleep(500); // İşlem bitiş payı
+        await sleep(500); 
         bot.closeWindow(win);
     }
 }
@@ -118,7 +113,6 @@ async function performRoutine() {
             try {
                 await bot.clickWindow(compass.slot, 0, 0);
                 console.log('[RUTİN] Pusulaya tıklandı, ışınlanılıyor...');
-                // Işınlanma süresini mola süresinden düşeceğiz, burada sadece bekleyelim
                 await sleep(5000); 
             } catch (e) { console.log(`[HATA] Tıklama sorunu: ${e.message}`); }
         } else {
@@ -127,21 +121,19 @@ async function performRoutine() {
         }
     }
     
-    // Yeni konumu kaydet
     if (bot.entity) anchorPoint = bot.entity.position.clone();
     isBusy = false;
 }
 
-// ============== ANA DÖNGÜ (ZAMAN AYARLI) ==============
+// ============== ANA DÖNGÜ (15sn İŞLEM / 15sn MOLA) ==============
 
 async function startFarmerLoop() {
-    console.log('[SİSTEM] Farm Başladı. (10s Aktif / 10s Pasif)');
+    console.log('[SİSTEM] Farm Başladı. (~15s Aktif / 15s Pasif)');
 
     while (isFarmerActive) {
         try {
             loopCount++;
-            const cycleStartTime = Date.now();
-
+            
             // --- A. RUTİN KONTROLÜ (40 Döngüde Bir) ---
             if (loopCount % CONFIG.routine_loop === 0) {
                 await performRoutine();
@@ -154,37 +146,31 @@ async function startFarmerLoop() {
                 return;
             }
 
-            // --- C. İŞLEM ZAMANI (~10 Saniye) ---
-            // 1. Çiftçi
-            await doFarmer();
-            await sleep(1000); // İki işlem arası kısa boşluk
+            // --- C. İŞLEM ZAMANI (Hedef: ~15 Saniye) ---
             
-            // 2. Sat
+            // 1. Çiftçi (~3 saniye sürer)
+            await doFarmer();
+            
+            // Ara Bekleme (Süreyi 15 saniyeye tamamlamak için uzatıldı)
+            await sleep(3000); 
+            
+            // 2. Sat (~9 saniye sürer -> 36 slot * 140ms + gecikmeler)
             await doSell();
             
-            // İşlemlerin ne kadar sürdüğünü hesapla
-            const cycleDuration = Date.now() - cycleStartTime;
-            
-            // Eğer işlemler 10 saniyeden kısa sürdüyse, 10 saniyeye tamamla (Opsiyonel, ama sen "tam 10s sürsün" dedin)
-            // Ancak "Sat" işlemi envantere göre değiştiği için burayı esnek bırakmak daha iyi.
-            // Biz sadece "Sat" ve "Çiftçi" işleminin toplamının 10 saniyeyi geçmemesine özen gösterdik.
-
-            // --- D. MOLA ZAMANI (Tam 10 Saniye) ---
-            // Sef.js'in göreceği bir log atmayalım, sessizce bekleyelim.
+            // --- D. MOLA ZAMANI (Tam 15 Saniye) ---
             await sleep(CONFIG.rest_time);
 
         } catch (e) {
             console.log(`[DÖNGÜ HATA] ${e.message}`);
-            await sleep(5000); // Hata durumunda bekle
+            await sleep(5000); 
         }
     }
 }
 
-// ============== HAREKET SİSTEMİ (SADECE GEREKİRSE) ==============
+// ============== HAREKET SİSTEMİ ==============
 async function movementLoop() {
     while (true) {
         if (isFarmerActive && !isBusy && CONFIG.anti_afk) {
-            // Basit rastgele kafa çevirme (Daha az yük)
             if (bot.entity) {
                 const yaw = (Math.random() * Math.PI * 2) - Math.PI;
                 const pitch = (Math.random() * Math.PI / 2) - (Math.PI / 4);
@@ -202,10 +188,9 @@ function createBot() {
         port: CONFIG.port,
         username: CONFIG.username,
         version: CONFIG.version,
-        checkTimeoutInterval: 60000 // İnternet kopmalarını daha toleranslı karşıla
+        checkTimeoutInterval: 60000 
     });
 
-    // Sadece pathfinder yüklüyoruz ama anti_afk false ise kullanmayacağız
     bot.loadPlugin(pathfinder);
 
     bot.once('spawn', () => {
@@ -221,11 +206,9 @@ function createBot() {
     // --- SEF.JS İÇİN LOG YAKALAYICI ---
     bot.on('message', (msg) => {
         const text = msg.toString();
-        // Kazanç Logu
         if (text.includes('+$') || text.includes('hesabınıza') || text.includes('satıldı')) {
             console.log(`💰 [KAZANÇ] ${text}`);
         }
-        // Transfer Logu
         else if (text.includes('gönderdiniz') || text.includes('gönderildi')) {
             console.log(`💸 [TRANSFER] ${text}`);
         }
