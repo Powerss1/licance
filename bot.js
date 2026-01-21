@@ -7,12 +7,12 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 
 // --- AYARLAR ---
 const CONFIG = {
-    username: 'melihbaskan56', 
+    username: 'AthenaX', 
     host: 'oyna.craftluna.net',
     port: 25565,
     version: '1.20.1',
     
-    auth_cmd: '/login power000', 
+    auth_cmd: '/login power111', 
     auth_delay: 5,
     towny_item: 'netherite_chestplate',
     
@@ -282,3 +282,4 @@ function createBot() {
 }
 
 createBot();
+
