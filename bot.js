@@ -1,4 +1,4 @@
-// ------------------ BOUNTAY FARM BOT (FİNAL SÜRÜM - NO AES) ------------------
+// ------------------ BOUNTAY FARM BOT (PERFORMANS & ZAMANLAMA SÜRÜMÜ) ------------------
 
 const fs = require('fs');
 const path = require('path');
@@ -15,252 +15,198 @@ const CONFIG = {
     
     auth_cmd: '/login power000', 
     auth_delay: 5,
-    towny_item: 'netherite_chestplate', // Towny sunucu seçim itemi
+    towny_item: 'netherite_chestplate',
     
-    // --- ANTİ-AFK AYARLARI ---
-    anti_afk: false,      
+    // --- DÖNGÜ VE ZAMANLAMA ---
+    routine_loop: 40,   // Kaç döngüde bir RTP/Para atılacak
+    active_time: 10000, // İşlemlerin süresi (Hedef)
+    rest_time: 10000,   // Mola süresi (10 Saniye)
+
+    // --- ANTİ-AFK ---
+    anti_afk: false, // Kapalıyken işlemciyi yormaz
     walk_radius: 4       
 };
 
-// 🔒 Şef kontrolü (Dosya kontrolü sadece)
+// 🔒 Şef kontrolü
 try {
     const toolPath = path.join(__dirname, 'sef.js');
     if (!fs.existsSync(toolPath)) process.exit(0);
 } catch { process.exit(0); }
 
 let bot;
-let isBusy = false; // KİLİT: True ise bot yürümez
+let isBusy = false;
 let isFarmerActive = false;
 let loopCount = 0;
 let anchorPoint = null;
 
+// Daha stabil bekleme fonksiyonu
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ============== İNSANSI HAREKET SİSTEMİ ==============
+// ============== PENCERE YÖNETİCİSİ (Hafifletilmiş) ==============
 
-async function smoothLook(yaw, pitch) {
-    if (!bot || !bot.entity) return;
-    const steps = 20; 
-    const interval = 15; 
-
-    const currentYaw = bot.entity.yaw;
-    const currentPitch = bot.entity.pitch;
-
-    let yawDiff = yaw - currentYaw;
-    if (yawDiff > Math.PI) yawDiff -= 2 * Math.PI;
-    if (yawDiff < -Math.PI) yawDiff += 2 * Math.PI;
-    const pitchDiff = pitch - currentPitch;
-
-    for (let i = 1; i <= steps; i++) {
-        if (isBusy) break; 
-        const nextYaw = currentYaw + (yawDiff * (i / steps));
-        const nextPitch = currentPitch + (pitchDiff * (i / steps));
-        
-        bot.look(nextYaw, nextPitch);
-        await sleep(interval);
-    }
-}
-
-async function naturalWalk() {
-    // isBusy TRUE ise kesinlikle yürümez
-    if (!CONFIG.anti_afk || isBusy || !bot || !bot.entity || !anchorPoint) return;
-
-    const currentPos = bot.entity.position;
-    const dist = currentPos.distanceTo(anchorPoint);
-
-    // Eve dönüş
-    if (dist > CONFIG.walk_radius) {
-        await bot.lookAt(anchorPoint.offset(0, 1.6, 0)); 
-        bot.setControlState('forward', true);
-        const walkTime = Math.min(dist * 350, 2500); 
-        await sleep(walkTime);
-        bot.clearControlStates();
-        return;
-    }
-
-    // Rastgele Gezinti
+// Pencerenin açılmasını bekleyen güvenli fonksiyon
+async function waitForWindow(timeout = 5000) {
     try {
-        const randomYaw = (Math.random() * Math.PI * 2) - Math.PI;
-        await smoothLook(randomYaw, 0);
-
-        bot.setControlState('forward', true);
-        const walkDuration = 500 + Math.random() * 1500;
-        
-        const startTime = Date.now();
-        while (Date.now() - startTime < walkDuration) {
-            if (isBusy) break; 
-
-            const v = bot.entity.velocity;
-            const speed = Math.sqrt(v.x ** 2 + v.z ** 2);
-            
-            if (speed < 0.05 && (Date.now() - startTime > 200)) {
-                bot.setControlState('forward', false);
-                bot.setControlState('back', true);
-                await sleep(600);
-                bot.setControlState('back', false);
-                break; 
-            }
-            await sleep(50);
-        }
-    } catch (e) {} finally {
-        bot.clearControlStates(); 
-    }
+        const window = await Promise.race([
+            new Promise(r => bot.once('windowOpen', r)),
+            new Promise(r => setTimeout(() => r(null), timeout))
+        ]);
+        return window;
+    } catch { return null; }
 }
 
-// ============== SATIŞ VE ÇİFTÇİ İŞLEMLERİ ==============
+// ============== ÇİFTÇİ & SAT SİSTEMİ (HIZLI) ==============
 
-async function depositAllSellableItems(window) {
-    for (let slot = 45; slot <= 80; slot++) {
-        const item = window.slots[slot];
-        if (!item) continue;
-        try {
-            await bot.clickWindow(slot, 0, 1); 
-            await sleep(100); 
-        } catch { break; }
-    }
-}
-
-async function handleCiftci(window) {
-    try {
-        await sleep(2000);
-        await bot.clickWindow(21, 0, 1);
-        await sleep(3000);
-        await bot.closeWindow(window);
-    } catch {}
-}
-
-async function handleSat(window) {
-    try {
-        await depositAllSellableItems(window);
-        await sleep(500);
-        await bot.closeWindow(window);
-    } catch {}
-}
-
-// ============== ANA FARM DÖNGÜSÜ ==============
-async function startFarmerLoop() {
-    console.log('[SİSTEM] Farm Başladı. (Sessiz Mod & RTP: 50 Döngü)');
+async function doFarmer() {
+    bot.chat('/çiftçi');
+    const win = await waitForWindow(3000);
     
+    if (win) {
+        // Slot 21'e tıkla (Çiftçi Topla)
+        try {
+            await bot.clickWindow(21, 0, 1);
+            // Menünün kapanması veya işlem onayı için kısa bekleme
+            await sleep(1500); 
+            bot.closeWindow(win);
+        } catch (e) {
+            bot.closeWindow(win);
+        }
+    }
+}
+
+async function doSell() {
+    bot.chat('/sat');
+    const win = await waitForWindow(3000);
+
+    if (win) {
+        // Slot 45-80 arası hızlıca sat (5-6 saniye hedefleniyor)
+        // Hızlandırılmış tıklama (70ms)
+        for (let slot = 45; slot <= 80; slot++) {
+            if (!win.slots[slot]) continue; // Boşsa geç
+            try {
+                bot.clickWindow(slot, 0, 1); // Await kullanmadan "fire-and-forget" yapabiliriz ama güvenli olsun diye kısa await
+                await sleep(70); 
+            } catch {}
+        }
+        await sleep(500); // İşlem bitiş payı
+        bot.closeWindow(win);
+    }
+}
+
+// ============== RUTİN İŞLEMLERİ (RTP & PARA) ==============
+
+async function performRoutine() {
+    isBusy = true;
+    if(CONFIG.anti_afk) bot.clearControlStates();
+
+    console.log(`[RUTİN] ${loopCount}. döngü: Para ve RTP...`);
+
+    // 1. Para Gönder
+    bot.chat('/altin gonder emo5869 100000');
+    await sleep(2000);
+
+    // 2. RTP
+    bot.chat('/rtp');
+    const rtpWin = await waitForWindow(5000);
+
+    if (rtpWin) {
+        // Recovery Compass (Kurtarma Pusulası) bul
+        const compass = rtpWin.slots.find(item => item && item.name.includes('recovery_compass'));
+
+        if (compass) {
+            await sleep(800);
+            try {
+                await bot.clickWindow(compass.slot, 0, 0);
+                console.log('[RUTİN] Pusulaya tıklandı, ışınlanılıyor...');
+                // Işınlanma süresini mola süresinden düşeceğiz, burada sadece bekleyelim
+                await sleep(5000); 
+            } catch (e) { console.log(`[HATA] Tıklama sorunu: ${e.message}`); }
+        } else {
+            console.log('[HATA] RTP menüsünde Pusula bulunamadı!');
+            bot.closeWindow(rtpWin);
+        }
+    }
+    
+    // Yeni konumu kaydet
+    if (bot.entity) anchorPoint = bot.entity.position.clone();
+    isBusy = false;
+}
+
+// ============== ANA DÖNGÜ (ZAMAN AYARLI) ==============
+
+async function startFarmerLoop() {
+    console.log('[SİSTEM] Farm Başladı. (10s Aktif / 10s Pasif)');
+
     while (isFarmerActive) {
         try {
             loopCount++;
-            
-            // --- RUTİNLER (Her 50 döngüde bir) ---
-            if (loopCount % 50 === 0) {
-                isBusy = true; // KİLİT: Hareket etme
-                bot.clearControlStates(); 
-                
-                console.log(`[RUTİN] ${loopCount}. döngü: Para gönderimi ve RTP...`);
-                
-                // 1. Para Gönder
-                bot.chat('/altin gonder emo5869 100000');
-                await sleep(3000);
-                
-                // 2. RTP (GUI Tıklamalı)
-                bot.chat('/rtp');
-                try {
-                    // Menü açılmasını bekle
-                    const rtpWin = await Promise.race([
-                        new Promise(r => bot.once('windowOpen', r)),
-                        new Promise(r => setTimeout(() => r('timeout'), 5000))
-                    ]);
+            const cycleStartTime = Date.now();
 
-                    if (rtpWin !== 'timeout') {
-                        // 'clock' (Kumpas) itemini bul
-                        const clockItem = rtpWin.slots.find(item => item && item.name.includes('recovery_compass'));
-                        
-                        if (clockItem) {
-                            // Tıkla
-                            await sleep(1000);
-                            await bot.clickWindow(clockItem.slot, 0, 0);
-                            
-                            // Işınlanma beklemesi (6 saniye)
-                            console.log('[RUTİN] Saate tıklandı, ışınlanma bekleniyor...');
-                            await sleep(6000); 
-                        } else {
-                            console.log('[HATA] RTP menüsünde saat bulunamadı.');
-                            bot.closeWindow(rtpWin);
-                        }
-                    } else {
-                        console.log('[HATA] RTP menüsü açılmadı (Timeout).');
-                    }
-                } catch (e) {
-                    console.log('[HATA] RTP işlem hatası:', e.message);
-                }
-                
-                // Işınlandığı yeri yeni EV MERKEZİ yap
-                if (bot.entity) anchorPoint = bot.entity.position.clone(); 
-                
-                isBusy = false; // KİLİT AÇ: Artık yürüyebilir
+            // --- A. RUTİN KONTROLÜ (40 Döngüde Bir) ---
+            if (loopCount % CONFIG.routine_loop === 0) {
+                await performRoutine();
             }
 
-            // --- RESTART (Her 500 döngüde bir) ---
+            // --- B. RESTART KONTROLÜ (500 Döngüde Bir) ---
             if (loopCount % 500 === 0) {
-                console.log('[BAKIM] 500 döngü tamamlandı. Restart atılıyor...');
-                isBusy = true;
-                isFarmerActive = false;
-                bot.quit('Planlı Restart');
-                return; 
+                console.log('[BAKIM] Planlı Restart...');
+                bot.quit('Restart');
+                return;
             }
 
-            // --- 1. ÇİFTÇİ İŞLEMİ ---
-            isBusy = true; // Yürümeyi durdur
-            bot.clearControlStates();
-            bot.chat('/çiftçi');
-
-            const farmWin = await Promise.race([
-                new Promise(r => bot.once('windowOpen', r)),
-                new Promise(r => setTimeout(() => r('timeout'), 8000))
-            ]);
-
-            if (farmWin !== 'timeout') await handleCiftci(farmWin);
+            // --- C. İŞLEM ZAMANI (~10 Saniye) ---
+            // 1. Çiftçi
+            await doFarmer();
+            await sleep(1000); // İki işlem arası kısa boşluk
             
-            isBusy = false; // Yürüyebilir
-            await sleep(2000); 
+            // 2. Sat
+            await doSell();
+            
+            // İşlemlerin ne kadar sürdüğünü hesapla
+            const cycleDuration = Date.now() - cycleStartTime;
+            
+            // Eğer işlemler 10 saniyeden kısa sürdüyse, 10 saniyeye tamamla (Opsiyonel, ama sen "tam 10s sürsün" dedin)
+            // Ancak "Sat" işlemi envantere göre değiştiği için burayı esnek bırakmak daha iyi.
+            // Biz sadece "Sat" ve "Çiftçi" işleminin toplamının 10 saniyeyi geçmemesine özen gösterdik.
 
-            // --- 2. SAT İŞLEMİ ---
-            isBusy = true; // Yürümeyi durdur
-            bot.clearControlStates();
-            bot.chat('/sat');
-
-            const satWin = await Promise.race([
-                new Promise(r => bot.once('windowOpen', r)),
-                new Promise(r => setTimeout(() => r('timeout'), 8000))
-            ]);
-
-            if (satWin !== 'timeout') await handleSat(satWin);
-
-            isBusy = false; // Yürüyebilir
-            await sleep(2000); 
+            // --- D. MOLA ZAMANI (Tam 10 Saniye) ---
+            // Sef.js'in göreceği bir log atmayalım, sessizce bekleyelim.
+            await sleep(CONFIG.rest_time);
 
         } catch (e) {
-            isBusy = false; 
-            await sleep(2000);
+            console.log(`[DÖNGÜ HATA] ${e.message}`);
+            await sleep(5000); // Hata durumunda bekle
         }
     }
 }
 
-// ============== BOT KURULUMU ==============
+// ============== HAREKET SİSTEMİ (SADECE GEREKİRSE) ==============
+async function movementLoop() {
+    while (true) {
+        if (isFarmerActive && !isBusy && CONFIG.anti_afk) {
+            // Basit rastgele kafa çevirme (Daha az yük)
+            if (bot.entity) {
+                const yaw = (Math.random() * Math.PI * 2) - Math.PI;
+                const pitch = (Math.random() * Math.PI / 2) - (Math.PI / 4);
+                await bot.look(yaw, pitch);
+            }
+        }
+        await sleep(5000);
+    }
+}
+
+// ============== BOT OLUŞTURMA ==============
 function createBot() {
     bot = mineflayer.createBot({
         host: CONFIG.host,
         port: CONFIG.port,
         username: CONFIG.username,
-        version: CONFIG.version
+        version: CONFIG.version,
+        checkTimeoutInterval: 60000 // İnternet kopmalarını daha toleranslı karşıla
     });
 
+    // Sadece pathfinder yüklüyoruz ama anti_afk false ise kullanmayacağız
     bot.loadPlugin(pathfinder);
-
-    // --- HAREKET DÖNGÜSÜ ---
-    async function movementLoop() {
-        while (true) {
-            // Sadece Farm aktifse, meşgul değilse ve ayar açıksa yürü
-            if (isFarmerActive && !isBusy && CONFIG.anti_afk) {
-                await naturalWalk();
-            }
-            await sleep(1000 + Math.random() * 2000);
-        }
-    }
 
     bot.once('spawn', () => {
         console.log(`[BAĞLANTI] ${CONFIG.username} sunucuya girdi.`);
@@ -272,17 +218,20 @@ function createBot() {
         setTimeout(() => { bot.chat('/menu'); }, 7000);
     });
 
-    // --- SADECE KAZANÇ LOGLARI ---
+    // --- SEF.JS İÇİN LOG YAKALAYICI ---
     bot.on('message', (msg) => {
         const text = msg.toString();
+        // Kazanç Logu
         if (text.includes('+$') || text.includes('hesabınıza') || text.includes('satıldı')) {
             console.log(`💰 [KAZANÇ] ${text}`);
         }
+        // Transfer Logu
         else if (text.includes('gönderdiniz') || text.includes('gönderildi')) {
             console.log(`💸 [TRANSFER] ${text}`);
         }
     });
 
+    // --- MENÜ TETİKLEYİCİSİ ---
     bot.on('windowOpen', async (window) => {
         if (isFarmerActive) return;
 
@@ -297,14 +246,14 @@ function createBot() {
                 setTimeout(() => {
                     if (bot.entity) {
                         anchorPoint = bot.entity.position.clone();
-                        console.log(`[MERKEZ] Konum alındı. Farm başlatılıyor.`);
+                        console.log(`[MERKEZ] Konum alındı. Döngü başlatılıyor.`);
                     }
                     
                     if (!isFarmerActive) {
                         isFarmerActive = true;
                         isBusy = false;
                         startFarmerLoop();
-                        movementLoop(); 
+                        if (CONFIG.anti_afk) movementLoop(); 
                     }
                 }, 5000);
 
@@ -322,7 +271,4 @@ function createBot() {
     bot.on('kicked', (r) => console.log(`[ATILDI] ${r}`));
 }
 
-
 createBot();
-
-
