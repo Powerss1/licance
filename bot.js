@@ -1,24 +1,29 @@
-// ------------------ BOUNTAY FARM BOT (AFK KAÇIŞ SİSTEMLİ) ------------------
+// ------------------ BOUNTAY FARM BOT (MULTI-ACCOUNT SYSTEM) ------------------
 
 const fs = require('fs');
 const path = require('path');
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements } = require('mineflayer-pathfinder');
 
-// --- AYARLAR ---
+// === HESAP LİSTESİ (BURAYI DOLDUR) ===
+const HESAPLAR = [
+    { user: 'AthenaX', pass: '/login power111' }, // 1. Hesap
+    { user: 'Korty', pass: '/login power111' }, // 2. Hesap
+    { user: 'Lauya', pass: '/login power111' }  // 3. Hesap
+];
+
+// === GENEL AYARLAR ===
 const CONFIG = {
-    username: 'AthenaX', 
     host: 'oyna.craftluna.net',
     port: 25565,
     version: '1.20.1',
     
-    auth_cmd: '/login power111', 
-    auth_delay: 5,
     towny_item: 'netherite_chestplate',
     
     // --- DÖNGÜ VE ZAMANLAMA ---
-    routine_loop: 40,   // Kaç döngüde bir Rutin RTP atılacak
+    eroutine_loop: 40,   // Kaç döngüde bir Rutin RTP atılacak
     rest_time: 15000,   // Mola süresi (15 Saniye)
+    gold_amount: 10000, // Gönderilecek altın miktarı
 
     // --- ANTİ-AFK ---
     anti_afk: false, 
@@ -31,13 +36,37 @@ try {
     if (!fs.existsSync(toolPath)) process.exit(0);
 } catch { process.exit(0); }
 
+// === GLOBAL DEĞİŞKENLER ===
 let bot;
+let currentAccountIndex = 0; // Şu anki hesap sırası (0, 1, 2)
+let failCount = 0;           // Hata sayacı
 let isBusy = false;
 let isFarmerActive = false;
 let loopCount = 0;
 let anchorPoint = null;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ============== HESAP YÖNETİMİ ==============
+
+function switchAccount() {
+    currentAccountIndex++;
+    if (currentAccountIndex >= HESAPLAR.length) {
+        currentAccountIndex = 0; // Başa dön
+    }
+    failCount = 0; // Hatayı sıfırla çünkü yeni hesaba geçtik
+    console.log(`[SİSTEM] ⚠️ Hesap Değiştiriliyor... Yeni Hesap: ${HESAPLAR[currentAccountIndex].user}`);
+}
+
+function handleConnectionError() {
+    failCount++;
+    console.log(`[HATA] Bağlantı başarısız! (Hata: ${failCount}/2)`);
+    
+    if (failCount >= 2) {
+        console.log(`[SİSTEM] ❌ Bu hesap 2 kez giremedi.`);
+        switchAccount();
+    }
+}
 
 // ============== PENCERE YÖNETİCİSİ ==============
 
@@ -73,7 +102,6 @@ async function doSell() {
     const win = await waitForWindow(3000);
 
     if (win) {
-        // Slot 45-80 arası sat (Hız: 140ms)
         for (let slot = 45; slot <= 80; slot++) {
             if (!win.slots[slot]) continue; 
             try {
@@ -86,8 +114,7 @@ async function doSell() {
     }
 }
 
-// ============== RTP İŞLEMİ (ORTAK FONKSİYON) ==============
-// Hem rutin hem de kaçış için kullanılacak
+// ============== RTP İŞLEMİ ==============
 async function executeRTP() {
     bot.chat('/rtp');
     const rtpWin = await waitForWindow(5000);
@@ -99,10 +126,9 @@ async function executeRTP() {
             await sleep(800);
             try {
                 await bot.clickWindow(compass.slot, 0, 0);
-                console.log('[HAREKET] RTP atıldı, ışınlanma bekleniyor...');
-                await sleep(8000); // Işınlanma süresi
+                console.log('[HAREKET] RTP atıldı, ışınlanma bekleniyor... (8sn)');
+                await sleep(8000); 
                 
-                // Yeni konumu kaydet
                 if (bot.entity) {
                     anchorPoint = bot.entity.position.clone();
                     console.log('[MERKEZ] Yeni konum kaydedildi.');
@@ -115,7 +141,7 @@ async function executeRTP() {
     }
 }
 
-// ============== RUTİN İŞLEMLERİ (PARA & PLANLI RTP) ==============
+// ============== RUTİN İŞLEMLERİ ==============
 
 async function performRoutine() {
     isBusy = true;
@@ -123,8 +149,8 @@ async function performRoutine() {
 
     console.log(`[RUTİN] ${loopCount}. döngü: Para gönderiliyor...`);
     
-    // 1. Para Gönder
-    bot.chat('/altin gonder emo5869 100000');
+    // 1. Para Gönder (10.000 Altın)
+    bot.chat(`/altin gonder emo5869 ${CONFIG.gold_amount}`);
     await sleep(2000);
 
     // 2. Planlı RTP
@@ -134,60 +160,50 @@ async function performRoutine() {
     isBusy = false;
 }
 
-// ============== AFK KONTROL VE KAÇIŞ SİSTEMİ ==============
+// ============== AFK KONTROL VE KAÇIŞ ==============
 async function checkAndEscapeAFK() {
     if (!bot.entity || !anchorPoint) return false;
 
-    // Eğer bot merkezden 20 bloktan fazla uzaklaşmışsa (AFK'ya çekilmiş demektir)
     const distance = bot.entity.position.distanceTo(anchorPoint);
 
     if (distance > 20) {
-        console.log(`[GÜVENLİK] DİKKAT! Bot merkezden ${Math.floor(distance)} blok uzakta! (AFK Bölgesi?)`);
-        console.log('[GÜVENLİK] 15sn bekleme iptal edildi, ACİL RTP atılıyor...');
-        
-        await executeRTP(); // Kaçış RTP'si
-        return true; // Kaçış yapıldı
+        console.log(`[GÜVENLİK] DİKKAT! Bot merkezden ${Math.floor(distance)} blok uzakta!`);
+        console.log('[GÜVENLİK] ACİL RTP atılıyor...');
+        await executeRTP(); 
+        return true; 
     }
-    
-    return false; // Sorun yok
+    return false; 
 }
 
 // ============== ANA DÖNGÜ ==============
 
 async function startFarmerLoop() {
-    console.log('[SİSTEM] Farm Başladı. (~15s Aktif / 15s Pasif + AFK Koruması)');
+    console.log(`[SİSTEM] Farm Başladı (${HESAPLAR[currentAccountIndex].user}).`);
 
     while (isFarmerActive) {
         try {
             loopCount++;
             
-            // --- A. RUTİN KONTROLÜ (40 Döngüde Bir) ---
-            if (loopCount % CONFIG.routine_loop === 0) {
-                await performRoutine();
-            }
+            // A. Rutin
+            if (loopCount % CONFIG.routine_loop === 0) await performRoutine();
 
-            // --- B. RESTART KONTROLÜ (500 Döngüde Bir) ---
+            // B. Restart
             if (loopCount % 500 === 0) {
                 console.log('[BAKIM] Planlı Restart...');
-                bot.quit('Restart');
+                // Planlı restartta failCount artmaz, temiz çıkış yapılır
+                isFarmerActive = false;
+                bot.quit('Restart'); 
                 return;
             }
 
-            // --- C. İŞLEM ZAMANI (~15 Saniye) ---
+            // C. İşlemler
             await doFarmer();
             await sleep(3000); 
             await doSell();
             
-            // --- D. MOLA VE AFK KONTROLÜ (15 Saniye) ---
-            // Burası kritik: Mola vermeden önce "Ben neredeyim?" diye bakar.
-            
+            // D. Mola & Güvenlik
             const escaped = await checkAndEscapeAFK();
-
-            if (!escaped) {
-                // Eğer kaçış yapmadıysa (yerindeyse), normal 15 saniye molasını verir.
-                // Eğer kaçış yaptıysa, zaten RTP süresince beklediği için tekrar 15sn beklemesine gerek yok (zaman kazancı).
-                await sleep(CONFIG.rest_time);
-            }
+            if (!escaped) await sleep(CONFIG.rest_time);
 
         } catch (e) {
             console.log(`[DÖNGÜ HATA] ${e.message}`);
@@ -212,10 +228,12 @@ async function movementLoop() {
 
 // ============== BOT OLUŞTURMA ==============
 function createBot() {
+    const currentAccount = HESAPLAR[currentAccountIndex];
+    
     bot = mineflayer.createBot({
         host: CONFIG.host,
         port: CONFIG.port,
-        username: CONFIG.username,
+        username: currentAccount.user, // Listeden seçilen kullanıcı adı
         version: CONFIG.version,
         checkTimeoutInterval: 60000 
     });
@@ -223,8 +241,12 @@ function createBot() {
     bot.loadPlugin(pathfinder);
 
     bot.once('spawn', () => {
-        console.log(`[BAĞLANTI] ${CONFIG.username} sunucuya girdi.`);
-        setTimeout(() => bot.chat(CONFIG.auth_cmd), CONFIG.auth_delay * 1000);
+        // Başarılı giriş yapılırsa hata sayacını sıfırla
+        failCount = 0; 
+        console.log(`[BAĞLANTI] ${currentAccount.user} sunucuya girdi.`);
+        
+        // Şifreyi listeden alıp gir
+        setTimeout(() => bot.chat(currentAccount.pass), 5000);
 
         const moves = new Movements(bot);
         bot.pathfinder.setMovements(moves);
@@ -232,22 +254,18 @@ function createBot() {
         setTimeout(() => { bot.chat('/menu'); }, 7000);
     });
 
-// --- BASİT +$ YAKALAYICI (FİLTRESİZ) ---
+    // --- BASİT +$ YAKALAYICI (FİLTRESİZ) ---
     bot.on('message', (msg) => {
         const text = msg.toString().trim();
 
-        // Hiçbir oyuncu engeli yok. Sadece "+$" işaretine bakıyoruz.
-        // Sunucu "+$502.04" attığı an yakalar.
         if (text.includes('+$')) {
             console.log(`💰 [KAZANÇ] ${text}`);
         }
-        
-        // Transfer mesajı kontrolü
         else if (text.includes('gönderdiniz') || text.includes('gönderildi')) {
             console.log(`💸 [TRANSFER] ${text}`);
         }
     });
-    
+
     bot.on('windowOpen', async (window) => {
         if (isFarmerActive) return;
 
@@ -277,17 +295,30 @@ function createBot() {
         }
     });
 
-    bot.on('end', () => {
-        console.log('[BAĞLANTI] Koptu. 10 saniye sonra yeniden bağlanılıyor...');
+    bot.on('end', (reason) => {
+        console.log(`[BAĞLANTI] Koptu (${reason}).`);
         isFarmerActive = false;
-        setTimeout(createBot, 10000);
+        
+        // Eğer bot kendi kendine kapandıysa (restart vb.) hemen bağlan
+        if (reason === 'Restart' || reason === 'Planlı Restart') {
+             setTimeout(createBot, 10000);
+        } else {
+            // Hata yüzünden kapandıysa sayacı kontrol et
+            handleConnectionError();
+            setTimeout(createBot, 10000);
+        }
     });
 
-    bot.on('error', (err) => console.log(`[HATA] ${err.message}`));
-    bot.on('kicked', (r) => console.log(`[ATILDI] ${r}`));
+    bot.on('error', (err) => {
+        console.log(`[HATA] ${err.message}`);
+        // Hata durumunda end tetiklenmezse diye önlem
+    });
+    
+    bot.on('kicked', (reason) => {
+        console.log(`[ATILDI] ${reason}`);
+        // Kicked olayı da connection error sayılır
+        // handleConnectionError() burada çağrılmaz, 'end' olayında çağrılır.
+    });
 }
 
 createBot();
-
-
-
