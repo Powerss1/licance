@@ -232,24 +232,17 @@ function createBot() {
         setTimeout(() => { bot.chat('/menu'); }, 7000);
     });
 
-    // --- FİLTRELENMİŞ PARA TAKİP SİSTEMİ (+$ FORMATI) ---
+// --- BASİT +$ YAKALAYICI (FİLTRESİZ) ---
     bot.on('message', (msg) => {
-        // Ham metni al, boşlukları temizle
         const text = msg.toString().trim();
-        
-        // 1. OYUNCU MESAJLARINI REDDET
-        // Eğer içinde ": " (sohbet) veya "<" (isim tagı) varsa DİREKT ÇÖPE AT
-        // Böylece oyuncular "+$1000" yazsa bile botu kandıramaz.
-        if (text.includes(': ') || text.startsWith('<') || text.startsWith('[Sohbet]')) return;
 
-        // 2. BASİT PARA YAKALAYICI
-        // Sadece ve sadece içinde "+$" geçiyorsa al.
-        // Örn: "+$1000", "+$1.500", "Satıştan +$50k geldi"
+        // Hiçbir oyuncu engeli yok. Sadece "+$" işaretine bakıyoruz.
+        // Sunucu "+$502.04" attığı an yakalar.
         if (text.includes('+$')) {
             console.log(`💰 [KAZANÇ] ${text}`);
         }
         
-        // 3. TRANSFER MESAJLARI
+        // Transfer mesajı kontrolü
         else if (text.includes('gönderdiniz') || text.includes('gönderildi')) {
             console.log(`💸 [TRANSFER] ${text}`);
         }
@@ -295,5 +288,6 @@ function createBot() {
 }
 
 createBot();
+
 
 
