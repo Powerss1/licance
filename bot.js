@@ -21,7 +21,7 @@ const CONFIG = {
     towny_item: 'netherite_chestplate',
     
     // --- DÖNGÜ VE ZAMANLAMA ---
-    eroutine_loop: 40,   // Kaç döngüde bir Rutin RTP atılacak
+    eroutine_loop: 15,   // Tam olarak her 15 döngüde bir Rutin RTP ve Para atılacak
     rest_time: 15000,   // Mola süresi (15 Saniye)
     gold_amount: 10000, // Gönderilecek altın miktarı
 
@@ -39,7 +39,7 @@ try {
 // === GLOBAL DEĞİŞKENLER ===
 let bot;
 let currentAccountIndex = 0; // Şu anki hesap sırası (0, 1, 2)
-let failCount = 0;           // Hata sayacı
+let failCount = 0;            // Hata sayacı
 let isBusy = false;
 let isFarmerActive = false;
 let loopCount = 0;
@@ -120,7 +120,6 @@ async function executeRTP() {
     const rtpWin = await waitForWindow(5000);
 
     if (rtpWin) {
-        // EKLENEN KISIM: Menü açıldıktan sonra eşyaların yüklenmesi için 2 saniye bekle
         console.log('[SİSTEM] Menü açıldı, eşyalar yükleniyor (2sn)...');
         await sleep(2000); 
 
@@ -188,13 +187,12 @@ async function startFarmerLoop() {
         try {
             loopCount++;
             
-            // A. Rutin
-            if (loopCount % CONFIG.routine_loop === 0) await performRoutine();
+            // A. Rutin (Her 15 döngüde bir)
+            if (loopCount % CONFIG.eroutine_loop === 0) await performRoutine();
 
             // B. Restart
             if (loopCount % 500 === 0) {
                 console.log('[BAKIM] Planlı Restart...');
-                // Planlı restartta failCount artmaz, temiz çıkış yapılır
                 isFarmerActive = false;
                 bot.quit('Restart'); 
                 return;
@@ -237,7 +235,7 @@ function createBot() {
     bot = mineflayer.createBot({
         host: CONFIG.host,
         port: CONFIG.port,
-        username: currentAccount.user, // Listeden seçilen kullanıcı adı
+        username: currentAccount.user, 
         version: CONFIG.version,
         checkTimeoutInterval: 60000 
     });
@@ -245,11 +243,9 @@ function createBot() {
     bot.loadPlugin(pathfinder);
 
     bot.once('spawn', () => {
-        // Başarılı giriş yapılırsa hata sayacını sıfırla
         failCount = 0; 
         console.log(`[BAĞLANTI] ${currentAccount.user} sunucuya girdi.`);
         
-        // Şifreyi listeden alıp gir
         setTimeout(() => bot.chat(currentAccount.pass), 5000);
 
         const moves = new Movements(bot);
@@ -258,7 +254,6 @@ function createBot() {
         setTimeout(() => { bot.chat('/menu'); }, 7000);
     });
 
-    // --- BASİT +$ YAKALAYICI (FİLTRESİZ) ---
     bot.on('message', (msg) => {
         const text = msg.toString().trim();
 
@@ -303,11 +298,9 @@ function createBot() {
         console.log(`[BAĞLANTI] Koptu (${reason}).`);
         isFarmerActive = false;
         
-        // Eğer bot kendi kendine kapandıysa (restart vb.) hemen bağlan
         if (reason === 'Restart' || reason === 'Planlı Restart') {
              setTimeout(createBot, 10000);
         } else {
-            // Hata yüzünden kapandıysa sayacı kontrol et
             handleConnectionError();
             setTimeout(createBot, 10000);
         }
@@ -315,13 +308,10 @@ function createBot() {
 
     bot.on('error', (err) => {
         console.log(`[HATA] ${err.message}`);
-        // Hata durumunda end tetiklenmezse diye önlem
     });
     
     bot.on('kicked', (reason) => {
         console.log(`[ATILDI] ${reason}`);
-        // Kicked olayı da connection error sayılır
-        // handleConnectionError() burada çağrılmaz, 'end' olayında çağrılır.
     });
 }
 
