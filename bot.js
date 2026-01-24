@@ -114,12 +114,16 @@ async function doSell() {
     }
 }
 
-// ============== RTP İŞLEMİ ==============
+// ============== RTP İŞLEMİ (DÜZELTİLMİŞ) ==============
 async function executeRTP() {
     bot.chat('/rtp');
     const rtpWin = await waitForWindow(5000);
 
     if (rtpWin) {
+        // EKLENEN KISIM: Menü açıldıktan sonra eşyaların yüklenmesi için 2 saniye bekle
+        console.log('[SİSTEM] Menü açıldı, eşyalar yükleniyor (2sn)...');
+        await sleep(2000); 
+
         const compass = rtpWin.slots.find(item => item && item.name.includes('recovery_compass'));
 
         if (compass) {
@@ -135,7 +139,7 @@ async function executeRTP() {
                 }
             } catch (e) { console.log(`[HATA] Tıklama sorunu: ${e.message}`); }
         } else {
-            console.log('[HATA] RTP menüsünde Pusula bulunamadı!');
+            console.log('[HATA] RTP menüsünde "recovery_compass" bulunamadı!');
             bot.closeWindow(rtpWin);
         }
     }
