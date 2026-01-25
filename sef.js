@@ -31,6 +31,7 @@ const bots = [
 const systemLogs = [];
 let animationTick = 0;
 let isRunning = true;
+let activeMode = 'FARM'; // Varsayılan mod
 
 // === GHOST TEMA MOTORU ===
 function greyGradient(text, offset = 0) {
@@ -133,12 +134,30 @@ function checkSecretFile() {
     });
 }
 
-// ================= GÖSTERGE PANELİ =================
+// ================= GÖSTERGE PANELİ (ORİJİNAL) =================
 function renderDashboard() {
     if (!isRunning) return;
     animationTick += 1;
     cursorTo(0, 0); 
 
+    // TELEGRAM MODU İÇİN BASİT GUI (2. ŞEMA)
+    if (activeMode === 'TELEGRAM') {
+        const width = 84;
+        const border = "═".repeat(width - 2);
+        process.stdout.write(greyGradient(`╔${border}╗\n`, animationTick));
+        process.stdout.write(greyGradient(`║` + " ".repeat(28) + "TELEGRAM COMMAND CENTER" + " ".repeat(29) + ` ║\n`, -animationTick));
+        process.stdout.write(greyGradient(`╠${border}╣\n`, animationTick));
+        
+        const logsToShow = systemLogs.slice(-12);
+        logsToShow.forEach(log => {
+             process.stdout.write(`  ${log}\x1b[K\n`);
+        });
+        for(let i=0; i < 12 - logsToShow.length; i++) process.stdout.write("\x1b[K\n");
+        process.stdout.write(greyGradient(`╚${border}╝`, animationTick));
+        return;
+    }
+
+    // FARM MODU (ORİJİNAL KODUN)
     const width = 84;
     const border = "═".repeat(width - 2);
     
@@ -231,6 +250,17 @@ function addLog(botName, text) {
 
 // ================= BOT YÖNETİMİ =================
 function startAllBots() {
+    // TELEGRAM MODU BAŞLATMA
+    if (activeMode === 'TELEGRAM') {
+        if (!fs.existsSync('telegrambot.js')) return;
+        const proc = spawn('node', ['telegrambot.js']);
+        proc.stdout.on('data', (d) => {
+            addLog("TG", d.toString().trim());
+        });
+        return;
+    }
+
+    // FARM MODU BAŞLATMA (ORİJİNAL)
     bots.forEach(bot => {
         if (!fs.existsSync(bot.file)) return; 
         if (bot.process) return; 
@@ -273,7 +303,7 @@ function startAllBots() {
     });
 }
 
-// ================= GİRİŞ EKRANI =================
+// ================= GİRİŞ EKRANI (ORİJİNAL - KORUNMUŞ) =================
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 function showLoginScreen() {
@@ -307,12 +337,23 @@ function showLoginScreen() {
             process.exit(1);
         }
 
-        setTimeout(() => {
+        // --- YENİ EKLENEN KISIM (SADECE SEÇİM) ---
+        clearScreen();
+        console.log(greyGradient("\n    ┌─ SİSTEM YÖNETİCİSİ ─────────────────────────────┐"));
+        console.log(greyGradient("    │ [1] FARM BOTLARINI BAŞLAT (Orijinal Mod)        │"));
+        console.log(greyGradient("    │ [2] TELEGRAM BOTUNU BAŞLAT (Uzaktan Kontrol)    │"));
+        console.log(greyGradient("    └─────────────────────────────────────────────────┘"));
+
+        rl.question(greyGradient('\n    [>] SEÇİMİNİZ : '), (choice) => {
+            if (choice === '2') activeMode = 'TELEGRAM';
+            else activeMode = 'FARM';
+            
             rl.close();
             clearScreen();
             setInterval(renderDashboard, CONFIG.refreshRate);
             startAllBots();
-        }, 1500);
+        });
+        // ------------------------------------------
     });
 }
 
