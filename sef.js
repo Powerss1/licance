@@ -7,6 +7,32 @@ const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const https = require('https');
 
+// === OTOMATİK MODÜL KONTROL FONKSİYONU ===
+function checkAndInstallModules() {
+    const REQUIRED_MODULES = ['mineflayer', 'node-telegram-bot-api', 'mineflayer-pathfinder'];
+    let missing = [];
+
+    for (const mod of REQUIRED_MODULES) {
+        try {
+            require.resolve(mod);
+        } catch (e) {
+            missing.push(mod);
+        }
+    }
+
+    if (missing.length > 0) {
+        console.log(`\n\x1b[93m[!] Eksik modüller bulundu: ${missing.join(', ')}\x1b[0m`);
+        console.log("\x1b[94m[*] Otomatik kurulum yapılıyor, lütfen bekleyin...\x1b[0m");
+        try {
+            execSync(`npm install ${missing.join(' ')}`, { stdio: 'inherit' });
+            console.log("\x1b[92m[+] Kurulum tamamlandı!\x1b[0m\n");
+        } catch (err) {
+            console.log("\x1b[91m[-] Yükleme başarısız. Lütfen internetinizi kontrol edin.\x1b[0m");
+            process.exit(1);
+        }
+    }
+}
+
 // === AYARLAR ===
 const CONFIG = {
     licenseKey: 'emo5869', 
@@ -17,7 +43,7 @@ const CONFIG = {
     refreshRate: 100,
     
     // Güncellenecek Dosyalar
-    filesToUpdate: ['sef.js', 'bot.js', 'package.json']     
+    filesToUpdate: ['sef.js', 'bot.js', 'telegrambot.js', 'package.json']     
 };
 
 // === MANUEL BOT LİSTESİ ===
@@ -250,6 +276,7 @@ function addLog(botName, text) {
 
 // ================= BOT YÖNETİMİ =================
 function startAllBots() {
+    checkAndInstallModules();
     // TELEGRAM MODU BAŞLATMA
     if (activeMode === 'TELEGRAM') {
         if (!fs.existsSync('telegrambot.js')) return;
@@ -359,3 +386,4 @@ function showLoginScreen() {
 
 showLoginScreen();
 process.on('exit', () => bots.forEach(b => b.process && b.process.kill()));
+
