@@ -1,4 +1,4 @@
-// ------------------ ATHENAX OS - V3 PLATINUM (FAILOVER INTEGRATED) ------------------
+// ------------------ ATHENAX OS - V3 PLATINUM (AUTO RECOVERY EDIT) ------------------
 
 const fs = require('fs');
 const path = require('path');
@@ -32,7 +32,8 @@ const CONFIG = {
 // === GLOBAL DEĞİŞKENLER ===
 let bot;
 let currentAccountIndex = 0;
-let failCount = 0; // Hata sayacı
+let failCount = 0; // Bağlantı hatası sayacı
+let incomeFailCount = 0; // [YENİ] Gelir alamama sayacı
 let isBusy = false;
 let isFarmerActive = false;
 let loopCount = 0;
@@ -70,14 +71,52 @@ async function waitForWindow(timeout = 5000) {
     } catch { return null; }
 }
 
+// ============== [YENİ] WATCHDOG (GELİR KORUMASI) ==============
+// Her 60 saniyede bir kontrol eder.
+setInterval(() => {
+    if (!isFarmerActive || !bot) return;
+
+    const timeSinceLastIncome = Date.now() - lastIncomeTime;
+    const limit = 3 * 60 * 1000; // 3 Dakika
+
+    if (timeSinceLastIncome > limit) {
+        if (incomeFailCount >= 1) {
+            // İkinci kez 3 dakika boyunca satış olmadı -> HESAP DEĞİŞTİR
+            console.log("⚠️ 3 Dakika kuralı (2. kez): Hesap değiştiriliyor.");
+            statusNote = "Gelir yok! Hesap Değişiyor...";
+            render();
+            
+            incomeFailCount = 0;
+            lastIncomeTime = Date.now(); // Yeni bot için zamanı sıfırla
+            currentAccountIndex = (currentAccountIndex + 1) % HESAPLAR.length;
+            if(bot) bot.quit(); // Quit, 'end' eventini tetikler ve yeni botu kurar
+        } else {
+            // İlk kez 3 dakika boyunca satış olmadı -> BOTU YENİDEN BAŞLAT
+            console.log("⚠️ 3 Dakika kuralı (1. kez): Bot yeniden başlatılıyor.");
+            statusNote = "Gelir yok! Yeniden Başlatılıyor...";
+            render();
+
+            incomeFailCount++;
+            lastIncomeTime = Date.now(); // Yeni bot için zamanı sıfırla
+            if(bot) bot.quit();
+        }
+    }
+}, 60000);
+
 // ============== TELEGRAM PANEL MOTORU ==============
 
 async function render() {
     let text = `👑 **ATHENAX ULTIMATE CONTROL**\n━━━━━━━━━━━━━━━━━━━━\n`;
     let keyboard = [];
 
+    // [YENİ] Zaman farkı hesaplama
+    const diffMs = Date.now() - lastIncomeTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    let timeString = diffMins < 3 ? "Şuan" : `${diffMins} dakika önce`;
+
     if (currentView === 'MAIN') {
-        text += `👤 **Aktif:** \`${HESAPLAR[currentAccountIndex].user}\`\n💰 **Kazanç:** \`+$${lastIncome}\`\n🔄 **Döngü:** \`${loopCount}/15\`\n📍 **Not:** \`${statusNote}\`\n━━━━━━━━━━━━━━━━━━━━`;
+        // [YENİ] Döngü satırı yerine Son Satış satırı eklendi
+        text += `👤 **Aktif:** \`${HESAPLAR[currentAccountIndex].user}\`\n💰 **Kazanç:** \`+$${lastIncome}\`\n🕒 **Son Satış:** \`${timeString}\`\n📍 **Not:** \`${statusNote}\`\n━━━━━━━━━━━━━━━━━━━━`;
         keyboard = [
             [{ text: isFarmerActive ? "⏹️ Farmı Durdur" : "▶️ Farmı Başlat", callback_data: 'toggle_farm' }],
             [{ text: "👥 Hesap Seç", callback_data: 'view_accounts' }, { text: "📍 Manuel RTP", callback_data: 'manual_rtp' }],
@@ -183,7 +222,12 @@ async function startFarmerLoop() {
 
             statusNote = "🟢 Hasat Tamamlandı"; render();
             await sleep(CONFIG.rest_time);
-        } catch (e) { await sleep(5000); }
+        } catch (e) { 
+            // [YENİ] Hata Yönetimi
+            console.log("Terminaldeki Command Centerde Hata meydana geldi 1 döngü tamamlanamadı");
+            // Hata olsa bile döngüyü bitmiş sayıp devam ediyoruz (loopCount yukarıda zaten arttı)
+            await sleep(2000); 
+        }
     }
 }
 
@@ -226,6 +270,7 @@ tBot.on('callback_query', async (query) => {
             statusNote = `🔄 ${HESAPLAR[idx].user} Geçiliyor...`;
             currentAccountIndex = idx;
             isFarmerActive = false;
+            incomeFailCount = 0; // Manuel geçişte sayacı sıfırla
             bot.quit();
         }
     }
@@ -264,6 +309,7 @@ function createBot() {
         // Başarılı giriş, hatayı sıfırla
         failCount = 0; 
         statusNote = `${acc.user} Oyuna Girdi`; 
+        lastIncomeTime = Date.now(); // Yeni giriş yaptığında süreyi yenile
         render();
         
         // Giriş rutinleri
@@ -276,6 +322,7 @@ function createBot() {
         if (text.includes('+$')) {
             lastIncome = text.split('$')[1].split(' ')[0];
             lastIncomeTime = Date.now();
+            incomeFailCount = 0; // [YENİ] Gelir geldiği için hata sayacını sıfırla
             render();
         }
     });
@@ -307,14 +354,14 @@ function createBot() {
         failCount++; 
 
         if (failCount >= 2) {
-            // 2 kez hata verdiyse sonraki hesaba geç
+            // 2 başarısız denemeden sonra diğer hesaba geçer
             statusNote = `⚠️ ${acc.user} başarısız! Diğer hesaba geçiliyor...`;
             render();
             
             failCount = 0;
+            incomeFailCount = 0; // Hesap değiştiği için gelir sayacını da sıfırla
             currentAccountIndex = (currentAccountIndex + 1) % HESAPLAR.length;
         } else {
-            // Henüz limit dolmadıysa tekrar dene
             statusNote = `🔴 Bağlantı Koptu (${failCount}/2). Tekrar deneniyor...`;
             render();
         }
