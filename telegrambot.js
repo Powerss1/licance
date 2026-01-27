@@ -25,7 +25,7 @@ const CONFIG = {
     towny_item: 'netherite_chestplate',
     eroutine_loop: 15,
     rest_time: 15000,
-    gold_amount: 10000,
+    gold_amount: 100000,
     anti_afk: false
 };
 
