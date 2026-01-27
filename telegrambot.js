@@ -1,4 +1,4 @@
-// ------------------ ATHENAX OS - V3 PLATINUM (AUTO RECOVERY EDIT) ------------------
+// ------------------ ATHENAX OS - V3 PLATINUM (STABLE CONNECT EDIT) ------------------
 
 const fs = require('fs');
 const path = require('path');
@@ -25,15 +25,15 @@ const CONFIG = {
     towny_item: 'netherite_chestplate',
     eroutine_loop: 15,
     rest_time: 15000,
-    gold_amount: 100000,
+    gold_amount: 10000,
     anti_afk: false
 };
 
 // === GLOBAL DEĞİŞKENLER ===
 let bot;
 let currentAccountIndex = 0;
-let failCount = 0; // Bağlantı hatası sayacı
-let incomeFailCount = 0; // [YENİ] Gelir alamama sayacı
+let failCount = 0; 
+let incomeFailCount = 0;
 let isBusy = false;
 let isFarmerActive = false;
 let loopCount = 0;
@@ -41,8 +41,6 @@ let anchorPoint = null;
 let lastIncome = "0";
 let lastIncomeTime = Date.now();
 let panelMessageId = null;
-
-// UI State
 let currentView = 'MAIN';
 let pinBuffer = "";
 let adminAuthorized = false;
@@ -55,7 +53,17 @@ if (fs.existsSync(lockFile)) {
 fs.writeFileSync(lockFile, process.pid.toString());
 process.on('exit', () => { if(fs.existsSync(lockFile)) fs.unlinkSync(lockFile); });
 
+// [DÜZELTME 1] Telegram Botu Hata Yakalama (Polling Error Fix)
 const tBot = new TelegramBot(tgToken, { polling: true });
+
+tBot.on('polling_error', (error) => {
+    // Bu blok Telegram bağlantısı kopsa bile scriptin çökmesini engeller
+    console.log(`[TG-SİSTEM] Bağlantı Hatası (Yoksayıldı): ${error.code}`);
+});
+
+tBot.on('webhook_error', (error) => {
+    console.log(`[TG-WEBHOOK] Hata: ${error.code}`);
+});
 
 // ============== YARDIMCI MEKANİKLER ==============
 
@@ -71,51 +79,42 @@ async function waitForWindow(timeout = 5000) {
     } catch { return null; }
 }
 
-// ============== [YENİ] WATCHDOG (GELİR KORUMASI) ==============
-// Her 60 saniyede bir kontrol eder.
+// ============== WATCHDOG (GELİR KORUMASI) ==============
 setInterval(() => {
     if (!isFarmerActive || !bot) return;
 
     const timeSinceLastIncome = Date.now() - lastIncomeTime;
-    const limit = 3 * 60 * 1000; // 3 Dakika
+    const limit = 3 * 60 * 1000; 
 
     if (timeSinceLastIncome > limit) {
         if (incomeFailCount >= 1) {
-            // İkinci kez 3 dakika boyunca satış olmadı -> HESAP DEĞİŞTİR
             console.log("⚠️ 3 Dakika kuralı (2. kez): Hesap değiştiriliyor.");
             statusNote = "Gelir yok! Hesap Değişiyor...";
             render();
-            
             incomeFailCount = 0;
-            lastIncomeTime = Date.now(); // Yeni bot için zamanı sıfırla
+            lastIncomeTime = Date.now(); 
             currentAccountIndex = (currentAccountIndex + 1) % HESAPLAR.length;
-            if(bot) bot.quit(); // Quit, 'end' eventini tetikler ve yeni botu kurar
+            if(bot) bot.quit(); 
         } else {
-            // İlk kez 3 dakika boyunca satış olmadı -> BOTU YENİDEN BAŞLAT
             console.log("⚠️ 3 Dakika kuralı (1. kez): Bot yeniden başlatılıyor.");
             statusNote = "Gelir yok! Yeniden Başlatılıyor...";
             render();
-
             incomeFailCount++;
-            lastIncomeTime = Date.now(); // Yeni bot için zamanı sıfırla
+            lastIncomeTime = Date.now(); 
             if(bot) bot.quit();
         }
     }
 }, 60000);
 
-// ============== TELEGRAM PANEL MOTORU ==============
-
+// ============== TELEGRAM PANEL ==============
 async function render() {
     let text = `👑 **ATHENAX ULTIMATE CONTROL**\n━━━━━━━━━━━━━━━━━━━━\n`;
     let keyboard = [];
-
-    // [YENİ] Zaman farkı hesaplama
     const diffMs = Date.now() - lastIncomeTime;
     const diffMins = Math.floor(diffMs / 60000);
     let timeString = diffMins < 3 ? "Şuan" : `${diffMins} dakika önce`;
 
     if (currentView === 'MAIN') {
-        // [YENİ] Döngü satırı yerine Son Satış satırı eklendi
         text += `👤 **Aktif:** \`${HESAPLAR[currentAccountIndex].user}\`\n💰 **Kazanç:** \`+$${lastIncome}\`\n🕒 **Son Satış:** \`${timeString}\`\n📍 **Not:** \`${statusNote}\`\n━━━━━━━━━━━━━━━━━━━━`;
         keyboard = [
             [{ text: isFarmerActive ? "⏹️ Farmı Durdur" : "▶️ Farmı Başlat", callback_data: 'toggle_farm' }],
@@ -149,15 +148,16 @@ async function render() {
     }
 
     if (!panelMessageId) {
-        const sent = await tBot.sendMessage(adminChatId, text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } });
-        panelMessageId = sent.message_id;
+        try {
+            const sent = await tBot.sendMessage(adminChatId, text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } });
+            panelMessageId = sent.message_id;
+        } catch(e) { console.log("TG Mesaj Hatası:", e.code); }
     } else {
         try { await tBot.editMessageText(text, { chat_id: adminChatId, message_id: panelMessageId, parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }); } catch (e) {}
     }
 }
 
-// ============== FARM VE HAREKET MEKANİKLERİ ==============
-
+// ============== FARM LOOP ==============
 async function executeRTP() {
     isBusy = true;
     safeChat('/rtp');
@@ -185,7 +185,6 @@ async function startFarmerLoop() {
             if (isBusy) { await sleep(2000); continue; }
             loopCount++;
 
-            // 15 Döngü Rutini
             if (loopCount % CONFIG.eroutine_loop === 0) {
                 isBusy = true;
                 statusNote = "📦 Rutin: Para + RTP"; render();
@@ -195,7 +194,6 @@ async function startFarmerLoop() {
                 isBusy = false;
             }
 
-            // Çiftçi & Sat
             safeChat('/çiftçi');
             const cwin = await waitForWindow(3000);
             if (cwin) { try { await bot.clickWindow(21, 0, 1); await sleep(1500); bot.closeWindow(cwin); } catch(e){} }
@@ -211,7 +209,6 @@ async function startFarmerLoop() {
                 bot.closeWindow(swin);
             }
 
-            // Mesafe Kontrolü
             if (bot.entity && anchorPoint) {
                 const dist = bot.entity.position.distanceTo(anchorPoint);
                 if (dist > 20) {
@@ -219,22 +216,17 @@ async function startFarmerLoop() {
                     await executeRTP();
                 }
             }
-
             statusNote = "🟢 Hasat Tamamlandı"; render();
             await sleep(CONFIG.rest_time);
         } catch (e) { 
-            // [YENİ] Hata Yönetimi
-            console.log("Terminaldeki Command Centerde Hata meydana geldi 1 döngü tamamlanamadı");
-            // Hata olsa bile döngüyü bitmiş sayıp devam ediyoruz (loopCount yukarıda zaten arttı)
+            console.log("Döngü hatası, devam ediliyor...");
             await sleep(2000); 
         }
     }
 }
 
-// ============== TELEGRAM BUTON DİNLEYİCİSİ ==============
-
+// ============== TELEGRAM BUTONLAR ==============
 let awaitingGold = false;
-
 tBot.on('callback_query', async (query) => {
     const data = query.data;
     if (query.message.chat.id.toString() !== adminChatId) return;
@@ -270,14 +262,12 @@ tBot.on('callback_query', async (query) => {
             statusNote = `🔄 ${HESAPLAR[idx].user} Geçiliyor...`;
             currentAccountIndex = idx;
             isFarmerActive = false;
-            incomeFailCount = 0; // Manuel geçişte sayacı sıfırla
+            incomeFailCount = 0; 
             bot.quit();
         }
     }
-
     if (data === 'git_pull') exec('git pull', (e, out) => tBot.sendMessage(adminChatId, out || "Hata"));
     if (data === 'reload') process.exit(1);
-
     render();
 });
 
@@ -293,26 +283,24 @@ tBot.on('message', (msg) => {
     }
 });
 
-// ============== BOT OLUŞTURMA VE HATA TOLERANSI ==============
-
+// ============== BOT OLUŞTURMA VE HATA YÖNETİMİ ==============
 function createBot() {
     const acc = HESAPLAR[currentAccountIndex];
+    console.log(`[SİSTEM] ${acc.user} için bot oluşturuluyor...`);
     
     bot = mineflayer.createBot({ 
         host: CONFIG.host, 
         port: CONFIG.port, 
         username: acc.user, 
-        version: CONFIG.version 
+        version: CONFIG.version,
+        checkTimeoutInterval: 30000 // 30 saniyede bir bağlantı kontrolü
     });
 
     bot.once('spawn', () => {
-        // Başarılı giriş, hatayı sıfırla
         failCount = 0; 
         statusNote = `${acc.user} Oyuna Girdi`; 
-        lastIncomeTime = Date.now(); // Yeni giriş yaptığında süreyi yenile
+        lastIncomeTime = Date.now(); 
         render();
-        
-        // Giriş rutinleri
         setTimeout(() => safeChat(acc.pass), 5000);
         setTimeout(() => safeChat('/menu'), 7000);
     });
@@ -322,7 +310,7 @@ function createBot() {
         if (text.includes('+$')) {
             lastIncome = text.split('$')[1].split(' ')[0];
             lastIncomeTime = Date.now();
-            incomeFailCount = 0; // [YENİ] Gelir geldiği için hata sayacını sıfırla
+            incomeFailCount = 0; 
             render();
         }
     });
@@ -346,20 +334,29 @@ function createBot() {
     });
 
     bot.on('kicked', (reason) => console.log(`Atıldı: ${reason}`));
-    bot.on('error', (err) => console.log(`Hata: ${err}`));
 
-    // --- FAILOVER MANTIĞI BURADA ---
+    // [DÜZELTME 2] Hata Yakalama (ETIMEDOUT için)
+    bot.on('error', (err) => {
+        console.log(`[BOT-HATA] ${err.code || err.message}`);
+        // Eğer ETIMEDOUT (Zaman aşımı) olursa 'end' eventi bazen tetiklenmez, manuel kapatalım:
+        if (err.code === 'ETIMEDOUT') {
+            console.log("[BOT] Zaman aşımı! Manuel yeniden başlatma tetikleniyor...");
+            bot.end(); // Bu, aşağıdaki 'end' listener'ı tetikler
+        }
+    });
+
+    // --- FAILOVER MANTIĞI ---
     bot.on('end', (reason) => {
         isFarmerActive = false;
         failCount++; 
 
+        console.log(`[BOT-SON] Bağlantı koptu. Sebep: ${reason}. Hata Sayısı: ${failCount}`);
+
         if (failCount >= 2) {
-            // 2 başarısız denemeden sonra diğer hesaba geçer
             statusNote = `⚠️ ${acc.user} başarısız! Diğer hesaba geçiliyor...`;
             render();
-            
             failCount = 0;
-            incomeFailCount = 0; // Hesap değiştiği için gelir sayacını da sıfırla
+            incomeFailCount = 0; 
             currentAccountIndex = (currentAccountIndex + 1) % HESAPLAR.length;
         } else {
             statusNote = `🔴 Bağlantı Koptu (${failCount}/2). Tekrar deneniyor...`;
