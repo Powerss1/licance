@@ -1,4 +1,4 @@
-// ------------------ ATHENAX OS - V3 PLATINUM (STABLE CONNECT EDIT) ------------------
+// ------------------ ATHENAX OS - V3 PLATINUM (PM2 EDITION) ------------------
 
 const fs = require('fs');
 const path = require('path');
@@ -6,10 +6,16 @@ const { exec } = require('child_process');
 const mineflayer = require('mineflayer');
 const TelegramBot = require('node-telegram-bot-api');
 
+// PM2 Bellek Sızıntısı Uyarısını Kapatır
+process.setMaxListeners(0);
+
 // === HESAPLAR VE CONFIG ===
 const tgToken = '8357212422:AAFuvGXPLFybOvGfwFJwEOIsE7jbtAj3Q0g';
 const adminChatId = '7550492553';
 const ADMIN_PIN = "8402";
+
+// PM2 kullandığımız için lockFile'ı sadece bilgilendirme amaçlı tutuyoruz
+// PM2 zaten aynı isimde ikinci bir botu başlatmaz.
 const lockFile = path.join(__dirname, 'bot.lock');
 
 const HESAPLAR = [
@@ -45,13 +51,6 @@ let currentView = 'MAIN';
 let pinBuffer = "";
 let adminAuthorized = false;
 let statusNote = "Sistem Başlatılıyor...";
-
-// 🔒 TEKİL SİSTEM KORUMASI
-if (fs.existsSync(lockFile)) {
-    try { process.kill(fs.readFileSync(lockFile, 'utf8'), 0); process.exit(0); } catch (e) { fs.unlinkSync(lockFile); }
-}
-fs.writeFileSync(lockFile, process.pid.toString());
-process.on('exit', () => { if(fs.existsSync(lockFile)) fs.unlinkSync(lockFile); });
 
 // [DÜZELTME 1] Telegram Botu Hata Yakalama (Polling Error Fix)
 const tBot = new TelegramBot(tgToken, { polling: true });
@@ -267,7 +266,13 @@ tBot.on('callback_query', async (query) => {
         }
     }
     if (data === 'git_pull') exec('git pull', (e, out) => tBot.sendMessage(adminChatId, out || "Hata"));
-    if (data === 'reload') process.exit(1);
+    // PM2 için reload mantığı
+    if (data === 'reload') {
+        statusNote = "Sistem Yeniden Başlatılıyor...";
+        render();
+        // PM2 process.exit(1) görünce botu otomatik yeniden başlatır
+        setTimeout(() => process.exit(1), 1000);
+    }
     render();
 });
 
