@@ -1,17 +1,19 @@
 // =================================================================
-// ========== POWERSS COMMAND CENTER - AUTO UPDATE EDITION =========
+// ========== POWERSS COMMAND CENTER - AUTO UPDATE & PM2 EDITION ===
 // =================================================================
 
 const readline = require('readline');
-const { spawn, execSync } = require('child_process');
+const { spawn, execSync, exec } = require('child_process'); // exec eklendi
 const fs = require('fs');
 const https = require('https');
 
 // === OTOMATİK MODÜL KONTROL FONKSİYONU ===
 function checkAndInstallModules() {
+    // PM2'yi de listeye ekledik, ancak PM2 genelde global kurulmalıdır.
     const REQUIRED_MODULES = ['mineflayer', 'node-telegram-bot-api', 'mineflayer-pathfinder'];
     let missing = [];
 
+    // 1. Standart Modül Kontrolü
     for (const mod of REQUIRED_MODULES) {
         try {
             require.resolve(mod);
@@ -20,14 +22,33 @@ function checkAndInstallModules() {
         }
     }
 
-    if (missing.length > 0) {
-        console.log(`\n\x1b[93m[!] Eksik modüller bulundu: ${missing.join(', ')}\x1b[0m`);
+    // 2. PM2 Global Kontrolü (Özel Kontrol)
+    let pm2Missing = false;
+    try {
+        execSync('pm2 -v', { stdio: 'ignore' });
+    } catch (e) {
+        pm2Missing = true;
+        console.log("\x1b[93m[!] PM2 Process Manager bulunamadı, listeye ekleniyor...\x1b[0m");
+    }
+
+    // Eksik varsa yükle
+    if (missing.length > 0 || pm2Missing) {
+        console.log(`\n\x1b[93m[!] Eksik modüller tamamlanıyor...\x1b[0m`);
         console.log("\x1b[94m[*] Otomatik kurulum yapılıyor, lütfen bekleyin...\x1b[0m");
+        
         try {
-            execSync(`npm install ${missing.join(' ')}`, { stdio: 'inherit' });
-            console.log("\x1b[92m[+] Kurulum tamamlandı!\x1b[0m\n");
+            // Normal modüller
+            if (missing.length > 0) {
+                execSync(`npm install ${missing.join(' ')}`, { stdio: 'inherit' });
+            }
+            // PM2 Global Kurulumu
+            if (pm2Missing) {
+                console.log("\x1b[94m[*] PM2 Global olarak kuruluyor...\x1b[0m");
+                execSync('npm install pm2 -g', { stdio: 'inherit' });
+            }
+            console.log("\x1b[92m[+] Tüm kurulumlar tamamlandı!\x1b[0m\n");
         } catch (err) {
-            console.log("\x1b[91m[-] Yükleme başarısız. Lütfen internetinizi kontrol edin.\x1b[0m");
+            console.log("\x1b[91m[-] Yükleme başarısız. Lütfen internetinizi kontrol edin veya yönetici olarak çalıştırın.\x1b[0m");
             process.exit(1);
         }
     }
@@ -40,7 +61,7 @@ const CONFIG = {
     repoName: 'licance',
     branch: 'main',       
     secretFileName: 'secret.txt', 
-    refreshRate: 100,
+    refreshRate: 500, // Render hızı PM2 modunda biraz düşürülebilir
     
     // Güncellenecek Dosyalar
     filesToUpdate: ['sef.js', 'bot.js', 'telegrambot.js', 'package.json']     
@@ -73,9 +94,8 @@ function greyGradient(text, offset = 0) {
 const cursorTo = (x, y) => process.stdout.write(`\x1b[${y + 1};${x + 1}H`);
 const clearScreen = () => process.stdout.write('\x1Bc');
 
-// ================= GÜNCELLEME SİSTEMİ (YENİ) =================
+// ================= GÜNCELLEME SİSTEMİ =================
 
-// Yardımcı: URL'den metin okuma
 function fetchString(url) {
     return new Promise((resolve) => {
         https.get(url, (res) => {
@@ -86,7 +106,6 @@ function fetchString(url) {
     });
 }
 
-// Yardımcı: Dosya indirme
 function downloadFile(url, dest) {
     return new Promise((resolve) => {
         const file = fs.createWriteStream(dest);
@@ -104,14 +123,10 @@ function downloadFile(url, dest) {
 async function checkForUpdates() {
     console.log(greyGradient("\n    📡 Güncellemeler Denetleniyor...", 0));
 
-    // 1. Yerel Sürüm Kontrolü
-    if (!fs.existsSync('version.txt')) {
-        fs.writeFileSync('version.txt', '1.0');
-    }
+    if (!fs.existsSync('version.txt')) fs.writeFileSync('version.txt', '1.0');
     let localVer = parseFloat(fs.readFileSync('version.txt', 'utf8'));
     if (isNaN(localVer)) localVer = 1.0;
 
-    // 2. Uzak Sürüm Kontrolü
     const versionUrl = `https://raw.githubusercontent.com/${CONFIG.repoOwner}/${CONFIG.repoName}/${CONFIG.branch}/version.txt`;
     const remoteVerStr = await fetchString(versionUrl);
     
@@ -122,7 +137,6 @@ async function checkForUpdates() {
 
     const remoteVer = parseFloat(remoteVerStr);
 
-    // 3. Karşılaştırma
     if (remoteVer > localVer) {
         console.log(greyGradient(`    ⬇️ YENİ SÜRÜM BULUNDU: v${remoteVer} (Mevcut: v${localVer})`, 5));
         console.log("    Dosyalar indiriliyor, lütfen bekleyin...");
@@ -135,13 +149,11 @@ async function checkForUpdates() {
             else console.log("❌");
         }
 
-        // Sürümü güncelle
         fs.writeFileSync('version.txt', remoteVer.toString());
         
         console.log("\n    ✅ GÜNCELLEME TAMAMLANDI! Tool yeniden başlatılıyor...");
         await new Promise(r => setTimeout(r, 2000));
 
-        // Programı yeniden başlat (Self-Restart)
         spawn(process.argv[0], process.argv.slice(1), { stdio: 'inherit' }).unref();
         process.exit();
     } else {
@@ -160,30 +172,31 @@ function checkSecretFile() {
     });
 }
 
-// ================= GÖSTERGE PANELİ (ORİJİNAL) =================
+// ================= GÖSTERGE PANELİ =================
 function renderDashboard() {
     if (!isRunning) return;
     animationTick += 1;
     cursorTo(0, 0); 
 
-    // TELEGRAM MODU İÇİN BASİT GUI (2. ŞEMA)
+    // TELEGRAM MODU İÇİN GUI
     if (activeMode === 'TELEGRAM') {
         const width = 84;
         const border = "═".repeat(width - 2);
         process.stdout.write(greyGradient(`╔${border}╗\n`, animationTick));
         process.stdout.write(greyGradient(`║` + " ".repeat(28) + "TELEGRAM COMMAND CENTER" + " ".repeat(29) + ` ║\n`, -animationTick));
+        process.stdout.write(greyGradient(`║` + " ".repeat(32) + "(PM2 MANAGED)" + " ".repeat(37) + ` ║\n`, -animationTick));
         process.stdout.write(greyGradient(`╠${border}╣\n`, animationTick));
         
-        const logsToShow = systemLogs.slice(-12);
+        const logsToShow = systemLogs.slice(-11);
         logsToShow.forEach(log => {
              process.stdout.write(`  ${log}\x1b[K\n`);
         });
-        for(let i=0; i < 12 - logsToShow.length; i++) process.stdout.write("\x1b[K\n");
+        for(let i=0; i < 11 - logsToShow.length; i++) process.stdout.write("\x1b[K\n");
         process.stdout.write(greyGradient(`╚${border}╝`, animationTick));
         return;
     }
 
-    // FARM MODU (ORİJİNAL KODUN)
+    // FARM MODU
     const width = 84;
     const border = "═".repeat(width - 2);
     
@@ -276,18 +289,42 @@ function addLog(botName, text) {
 
 // ================= BOT YÖNETİMİ =================
 function startAllBots() {
-    checkAndInstallModules();
-    // TELEGRAM MODU BAŞLATMA
+    checkAndInstallModules(); // PM2 kontrolü burada yapılır
+
+    // ---------------------------------------------------------
+    // TELEGRAM MODU (PM2 ENTEGRASYONU)
+    // ---------------------------------------------------------
     if (activeMode === 'TELEGRAM') {
-        if (!fs.existsSync('telegrambot.js')) return;
-        const proc = spawn('node', ['telegrambot.js']);
-        proc.stdout.on('data', (d) => {
-            addLog("TG", d.toString().trim());
+        if (!fs.existsSync('telegrambot.js')) {
+            addLog("HATA", "telegrambot.js dosyası bulunamadı!");
+            return;
+        }
+
+        addLog("PM2", "Eski süreçler temizleniyor...");
+        try { execSync('pm2 delete AthenaxBot', { stdio: 'ignore' }); } catch(e) {}
+
+        addLog("PM2", "Bot Başlatılıyor...");
+        
+        // PM2 BAŞLATMA KOMUTU
+        const command = `pm2 start telegrambot.js --name "AthenaxBot" --max-memory-restart 500M`;
+        
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                addLog("PM2 HATA", error.message);
+                return;
+            }
+            addLog("SİSTEM", "✅ Bot PM2 ile başarıyla başlatıldı!");
+            addLog("BİLGİ", "Logları görmek için terminale şunu yazın:");
+            addLog("KOMUT", "pm2 logs AthenaxBot");
+            addLog("BİLGİ", "Bu panel açık kalabilir veya kapatabilirsiniz.");
         });
+
+        // Bu modda spawn kullanmıyoruz, logları stdout'tan okumuyoruz
+        // çünkü PM2 arka planda çalışıyor.
         return;
     }
 
-    // FARM MODU BAŞLATMA (ORİJİNAL)
+    // FARM MODU (ORİJİNAL)
     bots.forEach(bot => {
         if (!fs.existsSync(bot.file)) return; 
         if (bot.process) return; 
@@ -330,7 +367,7 @@ function startAllBots() {
     });
 }
 
-// ================= GİRİŞ EKRANI (ORİJİNAL - KORUNMUŞ) =================
+// ================= GİRİŞ EKRANI =================
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 function showLoginScreen() {
@@ -352,7 +389,7 @@ function showLoginScreen() {
         
         console.log("\n    ✅ Giriş Başarılı!");
 
-        // 1. GÜNCELLEME KONTROLÜ (Girişten hemen sonra)
+        // 1. GÜNCELLEME KONTROLÜ
         await checkForUpdates();
         
         console.log("\n    🔄 Sunucu lisans dosyası kontrol ediliyor...");
@@ -364,11 +401,10 @@ function showLoginScreen() {
             process.exit(1);
         }
 
-        // --- YENİ EKLENEN KISIM (SADECE SEÇİM) ---
         clearScreen();
         console.log(greyGradient("\n    ┌─ SİSTEM YÖNETİCİSİ ─────────────────────────────┐"));
         console.log(greyGradient("    │ [1] FARM BOTLARINI BAŞLAT (Orijinal Mod)        │"));
-        console.log(greyGradient("    │ [2] TELEGRAM BOTUNU BAŞLAT (Uzaktan Kontrol)    │"));
+        console.log(greyGradient("    │ [2] TELEGRAM BOTUNU BAŞLAT (PM2 Korumalı Mod)   │"));
         console.log(greyGradient("    └─────────────────────────────────────────────────┘"));
 
         rl.question(greyGradient('\n    [>] SEÇİMİNİZ : '), (choice) => {
@@ -380,10 +416,13 @@ function showLoginScreen() {
             setInterval(renderDashboard, CONFIG.refreshRate);
             startAllBots();
         });
-        // ------------------------------------------
     });
 }
 
 showLoginScreen();
-process.on('exit', () => bots.forEach(b => b.process && b.process.kill()));
-
+process.on('exit', () => {
+    // Farm modundaysa normal botları öldür, PM2 modundaysa PM2'ye dokunma!
+    if (activeMode !== 'TELEGRAM') {
+        bots.forEach(b => b.process && b.process.kill());
+    }
+});
