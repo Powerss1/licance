@@ -7,9 +7,9 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 
 // === HESAP LİSTESİ (BURAYI DOLDUR) ===
 const HESAPLAR = [
-    { user: 'AthenaX', pass: '/login power111' }, // 1. Hesap
-    { user: 'Korty', pass: '/login power111' }, // 2. Hesap
-    { user: 'Lauya', pass: '/login power111' }  // 3. Hesap
+    { user: 'istroken', pass: '/login Power111' }, // 1. Hesap
+    { user: 'ilaket1', pass: '/login power111' }, // 2. Hesap
+    { user: 'Deletarban', pass: '/login power111' }  // 3. Hesap
 ];
 
 // === GENEL AYARLAR ===
@@ -316,3 +316,4 @@ function createBot() {
 }
 
 createBot();
+
