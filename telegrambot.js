@@ -187,7 +187,7 @@ async function startFarmerLoop() {
             if (loopCount % CONFIG.eroutine_loop === 0) {
                 isBusy = true;
                 statusNote = "📦 Rutin: Para + RTP"; render();
-                safeChat(`/altin gonder emo5869 ${CONFIG.gold_amount}`);
+                safeChat(`/altin gonder Mertbba311 ${CONFIG.gold_amount}`);
                 await sleep(2000);
                 await executeRTP();
                 isBusy = false;
