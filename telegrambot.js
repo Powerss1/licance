@@ -19,9 +19,9 @@ const ADMIN_PIN = "8402";
 const lockFile = path.join(__dirname, 'bot.lock');
 
 const HESAPLAR = [
-    { user: 'AthenaX', pass: '/login power111' },
-    { user: 'Korty', pass: '/login power111' },
-    { user: 'Lauya', pass: '/login power111' }
+    { user: 'istroken', pass: '/login Power111' }, // 1. Hesap
+    { user: 'ilaket1', pass: '/login power111' }, // 2. Hesap
+    { user: 'Deletarban', pass: '/login power111' }  // 3. Hesap
 ];
 
 const CONFIG = {
