@@ -18,10 +18,11 @@ const ADMIN_PIN = "8402";
 // PM2 zaten aynı isimde ikinci bir botu başlatmaz.
 const lockFile = path.join(__dirname, 'bot.lock');
 
+// === HESAP LİSTESİ (BURAYI DOLDUR) ===
 const HESAPLAR = [
-    { user: 'istroken', pass: '/login Power111' }, // 1. Hesap
-    { user: 'ilaket1', pass: '/login power111' }, // 2. Hesap
-    { user: 'Deletarban', pass: '/login power111' }  // 3. Hesap
+    { user: 'serdar046', pass: '/login power000' }, // 1. Hesap
+    { user: 'Lauya', pass: '/login power111' }, // 2. Hesap
+    { user: 'Korty', pass: '/login power111' }  // 3. Hesap
 ];
 
 const CONFIG = {
@@ -31,7 +32,7 @@ const CONFIG = {
     towny_item: 'netherite_chestplate',
     eroutine_loop: 15,
     rest_time: 15000,
-    gold_amount: 100000,
+    gold_amount: 10000,
     anti_afk: false
 };
 
