@@ -7,9 +7,9 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder');
 
 // === HESAP LİSTESİ (BURAYI DOLDUR) ===
 const HESAPLAR = [
-    { user: 'istroken', pass: '/login Power111' }, // 1. Hesap
-    { user: 'ilaket1', pass: '/login power111' }, // 2. Hesap
-    { user: 'Deletarban', pass: '/login power111' }  // 3. Hesap
+    { user: 'serdar046', pass: '/login power000' }, // 1. Hesap
+    { user: 'Lauya', pass: '/login power111' }, // 2. Hesap
+    { user: 'Korty', pass: '/login power111' }  // 3. Hesap
 ];
 
 // === GENEL AYARLAR ===
@@ -23,7 +23,7 @@ const CONFIG = {
     // --- DÖNGÜ VE ZAMANLAMA ---
     eroutine_loop: 15,   // Tam olarak her 15 döngüde bir Rutin RTP ve Para atılacak
     rest_time: 15000,   // Mola süresi (15 Saniye)
-    gold_amount: 10000, // Gönderilecek altın miktarı
+    gold_amount: 1000, // Gönderilecek altın miktarı
 
     // --- ANTİ-AFK ---
     anti_afk: false, 
